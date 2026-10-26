@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>รายงานผลการเลือกตั้ง สส. - Thailand Tilemap</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: 'Kanit', sans-serif; display: flex; background: #f7f4ee; margin: 0; padding: 20px; color: #222; }
+    
+    /* 1. เมนู Filter ฝั่งซ้าย */
+    #filter-menu {
+      width: 230px; background: white; padding: 15px; border-radius: 10px; margin-right: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); height: fit-content; flex-shrink: 0;
+    }
+    .filter-btn {
+      display: block; width: 100%; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #ddd;
+      background: #f9f9f9; border-radius: 5px; cursor: pointer; text-align: left; font-size: 13px; font-family: inherit;
+    }
+    .filter-btn.active { background: #333; color: white; border-color: #333; }
+    
+    .type-btn {
+      flex: 1; padding: 8px 4px; border: 1px solid #2c3e50; background: #fff; color: #2c3e50;
+      border-radius: 6px; cursor: pointer; text-align: center; font-size: 11px; font-weight: bold; font-family: inherit; transition: 0.2s;
+    }
+    .type-btn.active { background: #2c3e50; color: white; }
+
+    /* ปรับปุ่มโหมดเลือกปีเป็นสีกลาง Neutral Slate */
+    .mode-btn {
+      display: block; width: 100%; padding: 8px; margin-bottom: 5px; border: 1px solid #718096;
+      background: #fff; color: #4A5568; border-radius: 6px; cursor: pointer; text-align: center;
+      font-size: 12px; font-weight: bold; font-family: inherit; transition: 0.2s;
+    }
+    .mode-btn.active { background: #2D3748; color: white; border-color: #2D3748; }
+
+    /* 2. แผนที่ Tilemap ตรงกลาง */
+    #map-container { 
+      position: relative; overflow: hidden; flex-grow: 1; background: #f7f4ee; border-radius: 10px;
+      display: flex; gap: 10px;
+    }
+    
+    .map-wrapper {
+      position: relative; flex: 1; height: 88vh; background: #f7f4ee; border-radius: 8px; border: 1px solid #e0dcd3;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .map-header {
+      background: #2c3e50; color: white; text-align: center; padding: 6px; font-size: 13px; font-weight: bold;
+    }
+    
+    .tilemap-svg { cursor: grab; width: 100%; height: 100%; display: block; }
+    .tilemap-svg:active { cursor: grabbing; }
+
+    /* ปรับแต่งส่วนกล่องเมื่อเอาเมาส์ไปชี้เป็นสีดำพอดีกล่อง */
+    .box-shape { stroke: none; cursor: pointer; transition: opacity 0.25s, stroke 0.1s; }
+    .zone-group.highlighted .box-shape {
+      stroke: #000000;
+      stroke-width: 2px;
+      paint-order: stroke fill;
+    }
+    
+    .box.dimmed, .zone-group.dimmed { opacity: 0.15; }
+    .prov-label.dimmed { opacity: 0.2; }
+    
+    .label { fill: white; font-size: 10px; font-weight: bold; text-anchor: middle; dominant-baseline: central; pointer-events: none; text-shadow: 0 0 3px rgba(0,0,0,0.8); }
+    
+    .prov-label {
+      font-size: 13px; font-weight: 500; fill: #222; dominant-baseline: central; pointer-events: none;
+      font-family: 'Kanit', sans-serif;
+    }
+
+    /* ปุ่มควบคุม Zoom (+ / - / Reset) */
+    .zoom-controls {
+      position: absolute; top: 15px; right: 15px; display: flex; flex-direction: column; gap: 6px; z-index: 50;
+    }
+    .zoom-btn {
+      width: 36px; height: 36px; background: white; border: 1px solid #ccc; border-radius: 8px;
+      font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      display: flex; align-items: center; justify-content: center; user-select: none;
+    }
+    .zoom-btn:hover { background: #f0f0f0; }
+
+    /* Hover Card ขนาดเล็ก (ปรับให้ติดเมาส์) */
+    #tooltip {
+      position: fixed; display: none; background: white; border-radius: 8px;
+      padding: 10px 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); pointer-events: none; font-size: 12px;
+      z-index: 9999; min-width: 220px; border: 1px solid #eee;
+    }
+    
+    /* 3. Sidebar แสดงรายละเอียดคะแนนฝั่งขวา (ปรับเป็นสีเทาอ่อน Light Theme) */
+    #sidebar {
+      width: 360px; background: #f0ece1; color: #222222; padding: 20px; border-radius: 12px; margin-left: 20px;
+      min-height: 550px; box-sizing: border-box; flex-shrink: 0; max-height: 90vh; overflow-y: auto;
+      border: 1px solid #e2ddd0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    
+    .cand-card {
+      background: #ffffff; border-left: 4px solid #888; padding: 10px; margin-bottom: 8px; border-radius: 6px;
+      display: flex; align-items: center; gap: 10px; border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .avatar-wrapper { position: relative; width: 48px; height: 48px; flex-shrink: 0; }
+    .cand-avatar {
+      width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; border: 2px solid #cbd5e1;
+    }
+    .winner-badge {
+      position: absolute; bottom: -4px; right: -4px; color: white;
+      font-size: 10px; padding: 1px 4px; border-radius: 10px; font-weight: bold;
+    }
+    .cand-info { flex-grow: 1; }
+
+    .compare-box {
+      background: #ffffff; border: 1px solid #cbd5e1; padding: 10px; border-radius: 8px; margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .bigfam-badge {
+      display: inline-block; background: #FEFCBF; color: #744210; border: 1px solid #F6E05E;
+      font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- แถบ Filter ด้านซ้าย -->
+  <div id="filter-menu">
+    <h4 style="margin-top:0; margin-bottom:6px;">🗳️ รูปแบบมุมมอง</h4>
+    <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:12px;">
+      <div style="display:flex; gap:4px;">
+        <button class="type-btn active" id="type-con" onclick="setElectType('con')">แบ่งเขต</button>
+        <button class="type-btn" id="type-party" onclick="setElectType('party')">บัญชีรายชื่อ</button>
+      </div>
+      <button class="type-btn" id="type-sidebyside" onclick="setElectType('sidebyside')" style="background:#319795; color:white; border-color:#319795;">
+        เปรียบเทียบ (แบ่งเขต VS บัญชีรายชื่อ)
+      </button>
+    </div>
+
+    <h4 style="margin-top:0; margin-bottom:8px;">🗓️ ปีเลือกตั้ง</h4>
+    <button class="mode-btn active" id="btn-69" onclick="setYearMode('69')">ผลการเลือกตั้งปี 2569</button>
+    <button class="mode-btn" id="btn-66" onclick="setYearMode('66')">ผลการเลือกตั้งปี 2566</button>
+    <button class="mode-btn" id="btn-compare" onclick="setYearMode('compare')">เปรียบเทียบปี (2566 ➔ 2569)</button>
+
+    <!-- คำอธิบายสัญลักษณ์โหมดเปรียบเทียบ -->
+    <div id="compare-legend" style="display:none; background:#F7FAFC; border:1px solid #CBD5E0; padding:8px; border-radius:6px; font-size:11px; margin-bottom:10px; color:#2D3748;">
+      <b>💡 สัญลักษณ์การเปรียบเทียบ:</b><br>
+      • <span style="color:#d9d9d9; background:#333; padding:0 3px;">สีเดียว</span> = พรรคเดิมชนะทั้งสองปี<br>
+      • <span style="color:#2D3748; font-weight:bold;">สองสี</span> = เปลี่ยนพรรคที่ชนะ<br>
+      &nbsp;&nbsp;- <b>ซ้ายบน :</b> พรรคชนะปี 2566<br>
+      &nbsp;&nbsp;- <b>ขวาล่าง :</b> พรรคชนะปี 2569
+    </div>
+
+    <hr style="border:0; border-top:1px solid #eee; margin:12px 0;">
+
+    <h4 style="margin-top:0;">🏠 ตระกูลการเมือง / บ้านใหญ่</h4>
+    <button class="filter-btn" onclick="applyFilter('bigfam', 'ใช่', this)">🏠 เขตที่เป็นบ้านใหญ่</button>
+    <button class="filter-btn active" onclick="applyFilter('bigfam', 'all', this)">แสดงทั้งหมด</button>
+
+    <hr style="border:0; border-top:1px solid #eee; margin:12px 0;">
+
+    <h4 style="margin-top:0;">📍 ภูมิภาค</h4>
+    <button class="filter-btn" onclick="applyFilter('region', 'all', this)">ทั้งหมด (400 เขต)</button>
+    <button class="filter-btn" onclick="applyFilter('region', 'กรุงเทพฯ', this)">กรุงเทพมหานคร</button>
+    <button class="filter-btn" onclick="applyFilter('region', 'กลาง', this)">ภาคกลาง</button>
+    <button class="filter-btn" onclick="applyFilter('region', 'เหนือ', this)">ภาคเหนือ</button>
+    <button class="filter-btn" onclick="applyFilter('region', 'อีสาน', this)">ภาคอีสาน</button>
+    <button class="filter-btn" onclick="applyFilter('region', 'ใต้', this)">ภาคใต้</button>
+    <button class="filter-btn" onclick="applyFilter('region', 'ตะวันออก', this)">ภาคตะวันออก</button>
+
+    <hr style="border:0; border-top:1px solid #eee; margin:12px 0;">
+    <h4>🏆 พรรคที่ชนะ</h4>
+    <button class="filter-btn" onclick="applyFilter('party', 'ภูมิใจไทย', this)">ภูมิใจไทย</button>
+    <button class="filter-btn" onclick="applyFilter('party', 'ประชาชน', this)">ประชาชน (ก้าวไกล)</button>
+    <button class="filter-btn" onclick="applyFilter('party', 'เพื่อไทย', this)">เพื่อไทย</button>
+    <button class="filter-btn" onclick="applyFilter('party', 'รวมไทยสร้างชาติ', this)">รวมไทยสร้างชาติ</button>
+  </div>
+
+  <!-- แผนที่ Grid ตรงกลาง -->
+  <div id="map-container">
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomIn()" title="ซูมเข้า">+</button>
+      <button class="zoom-btn" onclick="zoomOut()" title="ซูมออก">−</button>
+      <button class="zoom-btn" onclick="resetZoom()" title="รีเซ็ตมุมมอง">↺</button>
+    </div>
+    <div id="tooltip"></div>
+
+    <div class="map-wrapper" id="wrapper-left">
+      <div class="map-header" id="header-left">สส. แบบแบ่งเขต</div>
+      <svg class="tilemap-svg" id="tilemap-left" viewBox="100 20 940 1420"></svg>
+    </div>
+
+    <div class="map-wrapper" id="wrapper-right" style="display:none;">
+      <div class="map-header" id="header-right">บัญชีรายชื่อ</div>
+      <svg class="tilemap-svg" id="tilemap-right" viewBox="100 20 940 1420"></svg>
+    </div>
+  </div>
+
+  <!-- แถบแสดงผลคะแนนด้านขวา -->
+  <div id="sidebar">
+    <h2 style="color: #1a202c; margin-top:0;">📊 ผลการเลือกตั้ง</h2>
+    <p style="color: #64748b; font-size: 13px;">👈 เลือกปีหรือประเภทการเลือกตั้ง เพื่อดูผลรายละเอียดคะแนน</p>
+  </div>
+
+<script>
+  let dataCon69 = null;
+  let dataCon66 = null;
+  let dataParty69 = null;
+  let dataParty66 = null;
+
+  let currentElectType = 'con'; // 'con', 'party', หรือ 'sidebyside'
+  let currentYearMode = '69';   // '69', '66', 'compare'
+
+  // 1. ตารางสีกำหนดประจำพรรคการเมือง
+  const partyColors = {
+    'ภูมิใจไทย': '#322485',
+    'ประชาชน': '#FF6411',
+    'ก้าวไกล': '#F77831',
+    'เพื่อไทย': '#D60003',
+    'กล้าธรรม': '#48CB74',
+    'ประชาธิปัตย์': '#01A4E4',
+    'รวมไทยสร้างชาติ': '#272D80',
+    'พลังประชารัฐ': '#086A3B',
+    'ไทรวมพลัง': '#FD318C',
+    'เพื่อไทรวมพลัง': '#FD318C',
+    'ประชาชาติ': '#A46D06',
+    'ไทยสร้างไทย': '#5A0F9D',
+    'ชาติไทยพัฒนา': '#E71485',
+    'เสรีรวมไทย': '#D8B720',
+    'โอกาสใหม่': '#F1666B',
+  };
+
+  // ดึงสีสำหรับการแสดงตัวอักษรคะแนนบน Sidebar
+  function getPartyTextColor(partyName) {
+    if (partyName === 'ภูมิใจไทย') return '#1e40af';
+    if (partyName === 'รวมไทยสร้างชาติ') return '#1e1b4b';
+    return partyColors[partyName] || '#2563eb';
+  }
+
+  // แปลงค่า HEX สีพรรคเป็น RGBA สำหรับสีพื้นหลังการ์ดผู้ชนะแบบจางๆ
+  function hexToRgba(hex, alpha = 0.1) {
+    if (!hex) return `rgba(226, 232, 240, ${alpha})`;
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+  }
+
+  // 2. ตารางแมปภูมิภาค 77 จังหวัด
+  const regionMap = {
+    'กรุงเทพมหานคร': 'กรุงเทพฯ',
+    'เชียงราย': 'เหนือ', 'เชียงใหม่': 'เหนือ', 'น่าน': 'เหนือ', 'พะเยา': 'เหนือ', 'แพร่': 'เหนือ', 'แม่ฮ่องสอน': 'เหนือ', 'ลำปาง': 'เหนือ', 'ลำพูน': 'เหนือ', 'อุตรดิตถ์': 'เหนือ', 'ตาก': 'เหนือ', 'พิษณุโลก': 'เหนือ', 'สุโขทัย': 'เหนือ', 'เพชรบูรณ์': 'เหนือ', 'พิจิตร': 'เหนือ', 'กำแพงเพชร': 'เหนือ', 'นครสวรรค์': 'เหนือ', 'อุทัยธานี': 'เหนือ',
+    'กาญจนบุรี': 'กลาง', 'กานต์จนบุรี': 'กลาง', 'นครนายก': 'กลาง', 'นครปฐม': 'กลาง', 'นนทบุรี': 'กลาง', 'ปทุมธานี': 'กลาง', 'ประจวบคีรีขันธ์': 'กลาง', 'พระนครศรีอยุธยา': 'กลาง', 'เพชรบุรี': 'กลาง', 'ราชบุรี': 'กลาง', 'ลพบุรี': 'กลาง', 'สมุทรปราการ': 'กลาง', 'สมุทรสงคราม': 'กลาง', 'สมุทรสาคร': 'กลาง', 'สระบุรี': 'กลาง', 'สิงห์บุรี': 'กลาง', 'สุพรรณบุรี': 'กลาง', 'อ่างทอง': 'กลาง', 'ชัยนาท': 'กลาง',
+    'จันทบุรี': 'ตะวันออก', 'ฉะเชิงเทรา': 'ตะวันออก', 'ชลบุรี': 'ตะวันออก', 'ตราด': 'ตะวันออก', 'ปราจีนบุรี': 'ตะวันออก', 'ระยอง': 'ตะวันออก', 'สระแก้ว': 'ตะวันออก',
+    'กาฬสินธุ์': 'อีสาน', 'ขอนแก่น': 'อีสาน', 'ชัยภูมิ': 'อีสาน', 'นครพนม': 'อีสาน', 'นครราชสีมา': 'อีสาน', 'บึงกาฬ': 'อีสาน', 'บุรีรัมย์': 'อีสาน', 'มหาสารคาม': 'อีสาน', 'มุกดาหาร': 'อีสาน', 'ยโสธร': 'อีสาน', 'ร้อยเอ็ด': 'อีสาน', 'เลย': 'อีสาน', 'ศรีสะเกษ': 'อีสาน', 'สกลนคร': 'อีสาน', 'สุรินทร์': 'อีสาน', 'หนองคาย': 'อีสาน', 'หนองบัวลำภู': 'อีสาน', 'อำนาจเจริญ': 'อีสาน', 'อุดรธานี': 'อีสาน', 'อุบลราชธานี': 'อีสาน',
+    'กระบี่': 'ใต้', 'ชุมพร': 'ใต้', 'ตรัง': 'ใต้', 'นครศรีธรรมราช': 'ใต้', 'นราธิวาส': 'ใต้', 'ปัตตานี': 'ใต้', 'พังงา': 'ใต้', 'พัทลุง': 'ใต้', 'ภูเก็ต': 'ใต้', 'ยะลา': 'ใต้', 'ระนอง': 'ใต้', 'สงขลา': 'ใต้', 'สตูล': 'ใต้', 'สุราษฎร์ธานี': 'ใต้'
+  };
+
+  // 3. เลย์เอาต์ตำแหน่งเขตเลือกตั้ง
+  const L = {
+    'เชียงราย':  { o:[355,65],  rows:[[0,3],[-22,3],[-22,1]], label:[362,43,'m'] },
+    'เชียงใหม่': { o:[231,106], rows:[[0,3],[0,3],[0,2],[0,1],[0,1]], label:[239,84,'m'] },
+    'แม่ฮ่องสอน':{ o:[185,170], rows:[[0,1],[0,1]], label:[175,148,'m'] },
+    'ลำพูน':     { o:[285,195], rows:[[0,1],[0,1]], label:[285,170,'m'] },
+    'ลำปาง':     { o:[339,163], rows:[[0,2],[0,2]], label:[338,141,'m'] },
+    'พะเยา':     { o:[398,127], rows:[[0,3]], label:[408,105,'m'] },
+    'แพร่':      { o:[406,176], rows:[[0,1],[0,1],[0,1]], label:[406,157,'m'] },
+    'น่าน':      { o:[511,130], rows:[[0,1],[-10,1],[-22,1]], label:[483,130,'m'] },
+    'อุตรดิตถ์': { o:[533,198], rows:[[0,1],[-22,2]], label:[462,219,'m'] },
+    'ตาก':       { o:[204,257], rows:[[0,1],[14,1],[28,1]], label:[201,237,'m'] },
+    'สุโขทัย':   { o:[322,236], rows:[[0,2],[0,2]], label:[333,214,'m'] },
+    'พิษณุโลก':  { o:[405,271], rows:[[0,3],[0,2]], label:[422,250,'m'] },
+    'พิจิตร':    { o:[335,316], rows:[[0,3]], label:[360,295,'m'] },
+    'กำแพงเพชร': { o:[276,311], rows:[[0,2],[0,2]], label:[286,288,'m'] },
+    'อุทัยธานี': { o:[264,370], rows:[[0,1],[11,1]], label:[224,368,'m'] },
+    'นครสวรรค์': { o:[333,370], rows:[[0,4],[44,2]], label:[352,347,'m'] },
+    'เพชรบูรณ์': { o:[450,358], rows:[[0,2],[0,2],[0,2]], label:[469,336,'m'] },
+
+    'เลย':        { o:[485,259], rows:[[0,1],[0,1],[0,2]], label:[511,275,'m'] },
+    'หนองคาย':    { o:[593,196], pts:[[0,0],[22,12],[44,0]], label:[613,173,'m'] },
+    'บึงกาฬ':     { o:[681,190], rows:[[0,3]], label:[693,168,'m'] },
+    'หนองบัวลำภู':{ o:[545,323], rows:[[0,3]], label:[568,300,'m'] },
+    'อุดรธานี':   { o:[619,257], rows:[[0,5],[0,5]], label:[627,236,'m'] },
+    'สกลนคร':     { o:[759,228], rows:[[0,2],[0,2],[0,2],[0,1]], label:[769,205,'m'] },
+    'นครพนม':     { o:[814,239], pts:[[0,0],[11,22],[21,44],[11,65]], label:[829,238,'s'] },
+    'กาฬสินธุ์':  { o:[720,348], rows:[[0,3],[0,3]], label:[726,323,'m'] },
+    'มุกดาหาร':   { o:[831,340], pts:[[0,0],[0,24]], label:[846,336,'s'] },
+    'อำนาจเจริญ': { o:[866,389], pts:[[0,0],[20,22]], label:[885,386,'s'] },
+    'ชัยภูมิ':    { o:[531,385], rows:[[0,2],[0,2],[0,3]], label:[531,363,'m'] },
+    'ขอนแก่น':    { o:[611,370], rows:[[0,3],[22,2],[22,2],[22,2],[22,2]], label:[627,347,'m'] },
+    'มหาสารคาม':  { o:[721,435], rows:[[0,2],[0,2],[0,2]], label:[732,413,'m'] },
+    'ร้อยเอ็ด':   { o:[785,424], rows:[[0,2],[0,2],[0,2],[0,2]], label:[797,401,'m'] },
+    'ยโสธร':      { o:[859,454], rows:[[0,1],[0,1],[0,1]], label:[857,432,'m'] },
+    'อุบลราชธานี':{ o:[918,452], rows:[[0,1],[0,2],[0,2],[0,2],[0,2],[0,2]], label:[935,452,'s'] },
+    'นครราชสีมา': { o:[511,498], rows:[[0,6],[0,6],[0,4]], label:[537,476,'m'] },
+    'บุรีรัมย์':  { o:[679,532], rows:[[0,2],[0,2],[0,2],[0,2],[0,2]], label:[680,511,'m'] },
+    'สุรินทร์':   { o:[766,561], rows:[[0,2],[-22,3],[-22,3]], label:[743,540,'m'] },
+    'ศรีสะเกษ':   { o:[833,562], rows:[[0,3],[0,3],[0,3]], label:[856,540,'m'] },
+
+    'ชัยนาท':    { o:[287,427], rows:[[0,2]], label:[248,425,'m'] },
+    'สิงห์บุรี':  { o:[396,430], rows:[[0,1]], label:[360,429,'m'] },
+    'ลพบุรี':    { o:[482,430], rows:[[0,1],[-44,3]], label:[452,428,'m'] },
+    'อ่างทอง':   { o:[376,469], rows:[[0,2]], label:[339,470,'m'] },
+    'สระบุรี':   { o:[438,513], rows:[[0,2],[0,2]], label:[462,491,'m'] },
+    'พระนครศรีอยุธยา': { o:[354,525], rows:[[0,3],[22,2]], label:[367,503,'m'], text:'อยุธยา' },
+    'สุพรรณบุรี':{ o:[271,474], rows:[[0,2],[0,2],[22,1]], label:[227,474,'m'] },
+    'กาญจนบุรี': { o:[240,559], rows:[[0,1],[11,1],[22,1],[32,1],[43,1]], label:[234,535,'m'] },
+    'นครปฐม':    { o:[322,588], rows:[[0,2],[0,2],[0,2]], label:[334,567,'m'] },
+    'ปทุมธานี':  { o:[404,582], rows:[[0,4],[0,4]], label:[455,559,'m'] },
+    'นนทบุรี':   { o:[420,657], rows:[[0,4],[0,4]], label:[430,635,'m'] },
+    'สมุทรสาคร': { o:[359,661], rows:[[0,2],[0,2]], label:[310,680,'m'] },
+    'สมุทรสงคราม':{ o:[359,715], rows:[[0,1]], label:[300,714,'m'] },
+    'สมุทรปราการ':{ o:[394,717], rows:[[0,5],[44,3]], label:[452,761,'m'] },
+    'ราชบุรี':   { o:[337,751], rows:[[0,2],[0,3]], label:[298,748,'m'] },
+    'เพชรบุรี':  { o:[343,805], rows:[[0,1],[0,2]], label:[305,802,'m'] },
+    'ประจวบคีรีขันธ์': { o:[341,866], rows:[[0,1],[-16,1],[-28,1]], label:[280,861,'m'] },
+    'กรุงเทพมหานคร': { o:[465,902], rows:[[0,8],[0,9],[0,9],[44,7]], label:[501,882,'m'] },
+
+    'นครนายก':   { o:[522,630], rows:[[0,2]], label:[535,610,'m'] },
+    'ปราจีนบุรี':{ o:[613,598], rows:[[0,1],[0,1],[0,1]], label:[613,575,'m'] },
+    'สระแก้ว':   { o:[703,663], rows:[[0,2],[0,1]], label:[718,685,'s'] },
+    'ฉะเชิงเทรา':{ o:[595,698], rows:[[0,4]], label:[615,677,'m'] },
+    'ชลบุรี':    { o:[524,701], rows:[[0,2],[0,3],[0,3],[0,1],[0,1]], label:[523,809,'m'] },
+    'ระยอง':     { o:[571,785], rows:[[0,3],[22,2]], label:[594,766,'m'] },
+    'จันทบุรี':  { o:[643,740], rows:[[0,1],[0,2]], label:[657,740,'s'] },
+    'ตราด':      { o:[672,816], rows:[[0,1]], label:[672,834,'m'] },
+
+    'ชุมพร':          { o:[310,944],  rows:[[0,1],[-13,1],[-22,1]], label:[272,943,'m'] },
+    'ระนอง':          { o:[254,1009], rows:[[0,1]], label:[218,1006,'m'] },
+    'สุราษฎร์ธานี':   { o:[289,1021], rows:[[0,2],[0,2],[0,2],[22,1]], label:[331,1018,'s'] },
+    'พังงา':          { o:[256,1055], rows:[[0,1],[0,1]], label:[224,1053,'m'] },
+    'นครศรีธรรมราช':  { o:[373,1063], rows:[[0,1],[0,1],[0,2],[0,2],[-22,3]], label:[388,1079,'s'] },
+    'กระบี่':         { o:[276,1135], rows:[[0,2],[0,1]], label:[276,1114,'m'] },
+    'ภูเก็ต':         { o:[237,1157], rows:[[0,1],[0,1],[0,1]], label:[206,1157,'m'] },
+    'ตรัง':           { o:[303,1205], rows:[[0,2],[0,2]], label:[274,1202,'m'] },
+    'พัทลุง':         { o:[365,1193], rows:[[0,1],[0,2]], label:[379,1193,'s'] },
+    'สตูล':           { o:[325,1265], rows:[[0,1],[0,1]], label:[295,1258,'m'] },
+    'สงขลา':          { o:[367,1253], rows:[[0,3],[0,3],[0,3]], label:[372,1327,'m'] },
+    'ปัตตานี':        { o:[460,1272], rows:[[0,2],[0,3]], label:[470,1250,'m'] },
+    'ยะลา':           { o:[460,1329], rows:[[0,2],[22,1]], label:[449,1350,'m'] },
+    'นราธิวาส':       { o:[525,1351], rows:[[0,2],[0,3]], label:[541,1396,'m'] }
+  };
+
+  const PITCH = 22;
+  const zoneCenters = {};
+  Object.entries(L).forEach(([name, cfg]) => {
+    const [ox, oy] = cfg.o;
+    let list = [];
+    if (cfg.pts) {
+      list = cfg.pts.map(([dx, dy]) => [ox + dx, oy + dy]);
+    } else {
+      cfg.rows.forEach(([dx, n], r) => {
+        for (let i = 0; i < n; i++) list.push([ox + dx + i * PITCH, oy + r * PITCH]);
+      });
+    }
+    zoneCenters[name] = list;
+  });
+
+  function getZoneCenter(provName, zoneNum) {
+    const list = zoneCenters[provName];
+    if (!list) return null;
+    if (list[zoneNum - 1]) return list[zoneNum - 1];
+    const last = list[list.length - 1];
+    return [last[0] + (zoneNum - list.length) * PITCH, last[1]];
+  }
+
+  const svgLeft = d3.select("#tilemap-left");
+  const svgRight = d3.select("#tilemap-right");
+  let mapGroupLeft = svgLeft.append("g").attr("id", "map-group-left");
+  let mapGroupRight = svgRight.append("g").attr("id", "map-group-right");
+
+  const tooltip = d3.select("#tooltip");
+  const sidebar = d3.select("#sidebar");
+  const boxSize = 20;
+
+  // 4. ระบบ D3 Zoom & Pan (Synchronized Zoom)
+  let isZooming = false;
+  const zoomLeft = d3.zoom().scaleExtent([0.4, 4]).on("zoom", (event) => syncZoom(event, svgRight, mapGroupRight));
+  const zoomRight = d3.zoom().scaleExtent([0.4, 4]).on("zoom", (event) => syncZoom(event, svgLeft, mapGroupLeft));
+
+  function syncZoom(event, targetSvg, targetGroup) {
+    targetGroup.attr("transform", event.transform);
+    if (!isZooming) {
+      isZooming = true;
+      targetSvg.call(event.transform.rescaleX ? zoomRight.transform : zoomLeft.transform, event.transform);
+      isZooming = false;
+    }
+  }
+
+  svgLeft.call(zoomLeft);
+  svgRight.call(zoomRight);
+
+  function zoomIn() { svgLeft.transition().duration(300).call(zoomLeft.scaleBy, 1.3); }
+  function zoomOut() { svgLeft.transition().duration(300).call(zoomLeft.scaleBy, 0.7); }
+  function resetZoom() { 
+    svgLeft.transition().duration(400).call(zoomLeft.transform, d3.zoomIdentity); 
+    svgRight.transition().duration(400).call(zoomRight.transform, d3.zoomIdentity); 
+  }
+
+  function getImgUrl(item) {
+    if (!item) return '';
+    const imgProp = item['รูปภาพ'] || item['Picture(URL)'] || item['logo'];
+    if (imgProp && imgProp.trim() !== '') {
+      return imgProp;
+    }
+    const partyName = item['สังกัดพรรค'] || item['พรรค'] || '';
+    const partyColor = (partyColors[partyName] || '666666').replace('#', '');
+    const nameSeed = item['ชื่อ-ชื่อสกุล'] || partyName || 'party';
+    return `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(nameSeed)}&backgroundColor=${partyColor}`;
+  }
+
+  function parseCSVData(rawData) {
+    if (!rawData || rawData.length === 0) return null;
+
+    rawData.forEach(d => {
+      const voteStr = d['คะแนน'] || d['ผลคะแนน'] || '0';
+      d.votes_num = parseInt(voteStr.toString().replace(/,/g, '')) || 0;
+      d.zone_num = parseInt(d['เขต']) || 1;
+      d['จังหวัด'] = (d['จังหวัด'] || '').trim();
+      d.party_name = d['สังกัดพรรค'] || d['พรรค'] || 'ไม่ระบุ';
+      d.bigfam = (d['บ้านใหญ่'] || '').trim();
+    });
+
+    const grouped = d3.group(rawData, d => d['จังหวัด'], d => d.zone_num);
+    const resultMap = new Map();
+
+    grouped.forEach((zones, provName) => {
+      zones.forEach((cands, zoneNum) => {
+        cands.sort((a, b) => b.votes_num - a.votes_num);
+        const totalVotes = d3.sum(cands, c => c.votes_num);
+
+        let hasBigFam = false;
+        cands.forEach((c, idx) => {
+          c.rank = idx + 1;
+          c.percent = totalVotes > 0 ? ((c.votes_num / totalVotes) * 100).toFixed(2) + '%' : '0%';
+          c.win = (idx === 0);
+          if (c.bigfam === 'ใช่') hasBigFam = true;
+        });
+
+        const winner = cands[0] || {};
+        const key = `${provName}_${zoneNum}`;
+        resultMap.set(key, {
+          prov: provName,
+          zone: zoneNum,
+          cands: cands,
+          winner: winner,
+          winnerParty: winner.party_name,
+          hasBigFam: hasBigFam
+        });
+      });
+    });
+
+    return resultMap;
+  }
+
+  function setElectType(type) {
+    currentElectType = type;
+    d3.selectAll('.type-btn').classed('active', false);
+    if (type === 'con') d3.select('#type-con').classed('active', true);
+    if (type === 'party') d3.select('#type-party').classed('active', true);
+    if (type === 'sidebyside') d3.select('#type-sidebyside').classed('active', true);
+
+    renderCurrentMap();
+  }
+
+  function setYearMode(mode) {
+    currentYearMode = mode;
+    d3.selectAll('.mode-btn').classed('active', false);
+    d3.select('#compare-legend').style('display', mode === 'compare' ? 'block' : 'none');
+
+    if (mode === '69') d3.select('#btn-69').classed('active', true);
+    if (mode === '66') d3.select('#btn-66').classed('active', true);
+    if (mode === 'compare') d3.select('#btn-compare').classed('active', true);
+
+    renderCurrentMap();
+  }
+
+  function buildDataset(raw69, raw66) {
+    const map69 = raw69 ? parseCSVData(raw69) : null;
+    const map66 = raw66 ? parseCSVData(raw66) : null;
+    if (!map69 && !map66) return null;
+
+    const keysSet = new Set();
+    if (map69) map69.forEach((v, k) => keysSet.add(k));
+    if (map66) map66.forEach((v, k) => keysSet.add(k));
+
+    const zoneList = [];
+    const provLabelsData = [];
+    const processedProvs = new Set();
+
+    keysSet.forEach(key => {
+      const z69 = map69 ? map69.get(key) : null;
+      const z66 = map66 ? map66.get(key) : null;
+
+      const provName = (z69 || z66).prov;
+      const zoneNum = (z69 || z66).zone;
+      const region = regionMap[provName] || 'กลาง';
+      const isBigFam = (z69 && z69.hasBigFam) || (z66 && z66.hasBigFam);
+
+      if (!processedProvs.has(provName)) {
+        processedProvs.add(provName);
+        const cfg = L[provName];
+        if (cfg) {
+          provLabelsData.push({
+            name: cfg.text || provName, x: cfg.label[0], y: cfg.label[1],
+            anchor: cfg.label[2] === 's' ? 'start' : 'middle', region: region
+          });
+        }
+      }
+
+      const party69 = z69 ? z69.winnerParty : 'ไม่ระบุ';
+      const party66 = z66 ? z66.winnerParty : 'ไม่ระบุ';
+
+      const color69 = partyColors[party69] || '#6B7280';
+      const color66 = partyColors[party66] || '#6B7280';
+
+      const normalizeP = p => (p === 'ก้าวไกล' ? 'ประชาชน' : (p === 'เพื่อไทรวมพลัง' ? 'ไทรวมพลัง' : p));
+      const isChanged = normalizeP(party66) !== normalizeP(party69);
+
+      let activeColor = color69;
+      if (currentYearMode === '66') activeColor = color66;
+
+      const center = getZoneCenter(provName, zoneNum);
+      if (!center) return;
+
+      const [cx, cy] = center;
+      const xPos = cx - boxSize / 2;
+      const yPos = cy - boxSize / 2;
+
+      zoneList.push({
+        key: key,
+        prov: provName,
+        zone: zoneNum,
+        region: region,
+        isBigFam: isBigFam,
+        party69: party69,
+        party66: party66,
+        color69: color69,
+        color66: color66,
+        color: activeColor,
+        isChanged: isChanged,
+        z69: z69,
+        z66: z66,
+        x: xPos,
+        y: yPos
+      });
+    });
+
+    return { zoneList, provLabelsData };
+  }
+
+  function renderCurrentMap() {
+    const isSideBySide = (currentElectType === 'sidebyside');
+
+    if (isSideBySide) {
+      d3.select('#wrapper-right').style('display', 'flex');
+      d3.select('#header-left').text(`สส. แบบแบ่งเขต (${currentYearMode === 'compare' ? 'เปรียบเทียบปี 2566 ➔ 2569' : 'ปี '+currentYearMode})`);
+      d3.select('#header-right').text(`บัญชีรายชื่อ (${currentYearMode === 'compare' ? 'เปรียบเทียบปี 2566 ➔ 2569' : 'ปี '+currentYearMode})`);
+
+      const dsLeft = buildDataset(dataCon69, dataCon66);
+      const dsRight = buildDataset(dataParty69, dataParty66);
+
+      renderSingleMap(mapGroupLeft, dsLeft ? dsLeft.zoneList : [], dsLeft ? dsLeft.provLabelsData : [], 'con');
+      renderSingleMap(mapGroupRight, dsRight ? dsRight.zoneList : [], dsRight ? dsRight.provLabelsData : [], 'party');
+
+    } else {
+      d3.select('#wrapper-right').style('display', 'none');
+      const isParty = (currentElectType === 'party');
+      d3.select('#header-left').text(isParty ? `บัญชีรายชื่อ (ปี ${currentYearMode})` : `สส. แบบแบ่งเขต (ปี ${currentYearMode})`);
+
+      const raw69 = isParty ? dataParty69 : dataCon69;
+      const raw66 = isParty ? dataParty66 : dataCon66;
+
+      const ds = buildDataset(raw69, raw66);
+      renderSingleMap(mapGroupLeft, ds ? ds.zoneList : [], ds ? ds.provLabelsData : [], currentElectType);
+    }
+  }
+
+  function renderSingleMap(mapGroup, dataset, labelsData, mapType) {
+    mapGroup.selectAll("*").remove();
+
+    mapGroup.selectAll(".prov-label")
+      .data(labelsData)
+      .enter()
+      .append("text")
+      .attr("class", "prov-label")
+      .attr("x", d => d.x)
+      .attr("y", d => d.y)
+      .attr("text-anchor", d => d.anchor)
+      .text(d => d.name);
+
+    const groups = mapGroup.selectAll(".zone-group")
+      .data(dataset)
+      .enter()
+      .append("g")
+      .attr("class", d => `zone-group zone-${d.key} ${d.isChanged && currentYearMode === 'compare' ? 'changed' : ''}`)
+      .attr("transform", d => `translate(${d.x}, ${d.y})`);
+
+    // การวาดรูปกล่องเขต
+    groups.each(function(d) {
+      const g = d3.select(this);
+
+      if (currentYearMode === 'compare' && d.isChanged) {
+        g.append("rect")
+          .attr("class", "box-shape")
+          .attr("width", boxSize)
+          .attr("height", boxSize)
+          .attr("fill", d.color69);
+
+        const halfSize = boxSize / 2;
+        g.append("polygon")
+          .attr("class", "box-shape")
+          .attr("points", `0,0 ${halfSize},0 0,${halfSize}`)
+          .attr("fill", d.color66);
+
+      } else {
+        g.append("rect")
+          .attr("class", "box-shape")
+          .attr("width", boxSize)
+          .attr("height", boxSize)
+          .attr("fill", currentYearMode === 'compare' ? d.color69 : d.color);
+      }
+    });
+
+    // พื้นที่สำหรับรับ Event
+    groups.append("rect")
+      .attr("width", boxSize)
+      .attr("height", boxSize)
+      .attr("fill", "transparent")
+      .style("cursor", "pointer")
+      .on("mouseover", (event, d) => {
+        d3.selectAll(`.zone-${d.key}`).classed('highlighted', true);
+
+        let content = `<div style="font-weight:bold; color:#111; margin-bottom:4px; font-size:13px;">
+          ${d.prov} เขต ${d.zone} ${d.isBigFam ? '<span class="bigfam-badge">🏠 บ้านใหญ่</span>' : ''}
+        </div>`;
+
+        if (currentYearMode === 'compare') {
+          const w66 = d.z66 ? d.z66.winner : null;
+          const w69 = d.z69 ? d.z69.winner : null;
+
+          if (d.isChanged) {
+            content += `<div style="background:#EDF2F7; border-left:3px solid #4A5568; padding:4px; font-size:11px; margin-bottom:6px; color:#2D3748; font-weight:bold;">
+              🔄 มีการเปลี่ยนพรรคที่ชนะ
+            </div>`;
+          }
+
+          // แสดงสีตามพรรค
+          const colorP69 = partyColors[d.party69] || '#3182CE';
+          const colorP66 = partyColors[d.party66] || '#3182CE';
+
+          // เรียงให้แสดงปี 2566 ก่อน ปี 2569
+          content += `
+            <div style="font-weight:bold; color:${colorP66}; margin-bottom:2px;">ปี 2566 : พรรค${d.party66}</div>
+            <div style="font-size:11px; color:#444;">${w66 ? (mapType === 'con' ? w66['ชื่อ-ชื่อสกุล'] : 'คะแนนบัญชีรายชื่อ') : '-'} (${w66 ? w66.votes_num.toLocaleString() : 0} คะแนน)</div>
+            <hr style="border:0; border-top:1px solid #eee; margin:5px 0;">
+            <div style="font-weight:bold; color:${colorP69}; margin-bottom:2px;">ปี 2569 : พรรค${d.party69}</div>
+            <div style="font-size:11px; color:#444;">${w69 ? (mapType === 'con' ? w69['ชื่อ-ชื่อสกุล'] : 'คะแนนบัญชีรายชื่อ') : '-'} (${w69 ? w69.votes_num.toLocaleString() : 0} คะแนน)</div>
+          `;
+        } else {
+          const targetZ = (currentYearMode === '66') ? d.z66 : d.z69;
+          const cands = targetZ ? targetZ.cands : [];
+          const c1 = cands[0] || { party_name: '-', votes_num: 0, percent: '0%' };
+          const c2 = cands[1] || { party_name: '-', votes_num: 0, percent: '0%' };
+
+          const colorWinner = partyColors[c1.party_name] || '#2D3748';
+
+          content += `
+            <div style="color:${colorWinner}; font-weight:bold;">1. ${mapType === 'party' ? 'พรรค'+c1.party_name : c1['ชื่อ-ชื่อสกุล'] + ' ('+c1.party_name+')'}</div>
+            <div style="font-size:11px; color:#555; margin-bottom:4px;">คะแนน: <b>${c1.votes_num.toLocaleString()}</b> (${c1.percent})</div>
+            <div style="color:#444;">2. ${mapType === 'party' ? 'พรรค'+c2.party_name : c2['ชื่อ-ชื่อสกุล'] + ' ('+c2.party_name+')'}</div>
+            <div style="font-size:11px; color:#777;">คะแนน: ${c2.votes_num.toLocaleString()}</div>
+          `;
+        }
+
+        tooltip.style("display", "block")
+          .html(content)
+          .style("left", (event.clientX + 10) + "px")
+          .style("top", (event.clientY + 10) + "px");
+      })
+      .on("mousemove", (event) => {
+        tooltip
+          .style("left", (event.clientX + 10) + "px")
+          .style("top", (event.clientY + 10) + "px");
+      })
+      .on("mouseout", (event, d) => {
+        d3.selectAll(`.zone-${d.key}`).classed('highlighted', false);
+        tooltip.style("display", "none");
+      })
+      .on("click", (event, d) => {
+        let html = `<h2 style="color:#1e293b; margin:0;">${d.prov} ${d.isBigFam ? '<span class="bigfam-badge">🏠 บ้านใหญ่</span>' : ''}</h2>`;
+        html += `<h3 style="margin-top:2px; font-weight:normal; color:#475569;">เขต ${d.zone}</h3>`;
+
+        if (currentElectType === 'sidebyside') {
+          const is66 = currentYearMode === '66';
+          const rawCon = is66 ? dataCon66 : dataCon69;
+          const rawParty = is66 ? dataParty66 : dataParty69;
+
+          const mapC = rawCon ? parseCSVData(rawCon) : null;
+          const mapP = rawParty ? parseCSVData(rawParty) : null;
+
+          const zC = mapC ? mapC.get(d.key) : null;
+          const zP = mapP ? mapP.get(d.key) : null;
+
+          const wC = zC ? zC.winner : null;
+          const wP = zP ? zP.winner : null;
+
+          const colorC = wC ? (partyColors[wC.party_name] || '#3b82f6') : '#3b82f6';
+          const colorP = wP ? (partyColors[wP.party_name] || '#2563eb') : '#2563eb';
+
+          html += `
+            <div class="compare-box" style="border-left: 4px solid ${colorC};">
+              <div style="color:${colorC}; font-weight:bold; font-size:14px; margin-bottom:5px;">อันดับ 1 สส. แบ่งเขต</div>
+              ${wC ? `
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <img src="${getImgUrl(wC)}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border: 2px solid ${colorC};">
+                  <div>
+                    <div style="font-weight:bold; color:#1e293b;">${wC['ชื่อ-ชื่อสกุล']}</div>
+                    <div style="font-size:12px; color:#64748b;">พรรค${wC.party_name} (${wC.votes_num.toLocaleString()} คะแนน)</div>
+                  </div>
+                </div>
+              ` : 'ไม่มีข้อมูล'}
+            </div>
+
+            <div class="compare-box" style="border-left: 4px solid ${colorP};">
+              <div style="color:${colorP}; font-weight:bold; font-size:14px; margin-bottom:5px;">อันดับ 1 บัญชีรายชื่อ</div>
+              ${wP ? `
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <img src="${getImgUrl(wP)}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border: 2px solid ${colorP};">
+                  <div>
+                    <div style="font-weight:bold; color:#1e293b;">พรรค${wP.party_name}</div>
+                    <div style="font-size:12px; color:#64748b;">คะแนน: ${wP.votes_num.toLocaleString()} (${wP.percent})</div>
+                  </div>
+                </div>
+              ` : 'ไม่มีข้อมูล'}
+            </div>
+          `;
+        } else if (currentYearMode === 'compare') {
+          const w66 = d.z66 ? d.z66.winner : null;
+          const w69 = d.z69 ? d.z69.winner : null;
+
+          const color69 = partyColors[d.party69] || '#3b82f6';
+          const color66 = partyColors[d.party66] || '#3b82f6';
+
+          // เรียงให้แสดงผลปี 2566 ก่อน ปี 2569
+          html += `
+            <div class="compare-box" style="border-left: 4px solid ${color66};">
+              <div style="color:${color66}; font-weight:bold; font-size:14px; margin-bottom:5px;">อันดับ 1 ปี 2566 (พรรค${d.party66})</div>
+              ${w66 ? `
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <img src="${getImgUrl(w66)}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border: 2px solid ${color66};">
+                  <div>
+                    <div style="font-weight:bold; color:#1e293b;">${mapType === 'con' ? w66['ชื่อ-ชื่อสกุล'] : 'พรรค'+w66.party_name}</div>
+                    <div style="font-size:12px; color:#64748b;">พรรค${w66.party_name} (${w66.votes_num.toLocaleString()} คะแนน)</div>
+                  </div>
+                </div>
+              ` : 'ไม่มีข้อมูล'}
+            </div>
+
+            <div class="compare-box" style="border-left: 4px solid ${color69};">
+              <div style="color:${color69}; font-weight:bold; font-size:14px; margin-bottom:5px;">อันดับ 1 ปี 2569 (พรรค${d.party69})</div>
+              ${w69 ? `
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <img src="${getImgUrl(w69)}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border: 2px solid ${color69};">
+                  <div>
+                    <div style="font-weight:bold; color:#1e293b;">${mapType === 'con' ? w69['ชื่อ-ชื่อสกุล'] : 'พรรค'+w69.party_name}</div>
+                    <div style="font-size:12px; color:#64748b;">พรรค${w69.party_name} (${w69.votes_num.toLocaleString()} คะแนน)</div>
+                  </div>
+                </div>
+              ` : 'ไม่มีข้อมูล'}
+            </div>
+          `;
+        } else {
+          const targetZ = (currentYearMode === '66') ? d.z66 : d.z69;
+          const cands = targetZ ? targetZ.cands : [];
+          const winnerParty = targetZ ? targetZ.winnerParty : 'ไม่ระบุ';
+
+          html += `<div style="font-size:12px; color:#64748b; margin-bottom:10px;">พรรคอันดับ 1 (${currentYearMode}): <b style="color:#1e293b;">${winnerParty}</b></div>`;
+          html += `<hr style="border-color:#cbd5e1; margin: 12px 0;">`;
+
+          cands.forEach((c) => {
+            const imgUrl = getImgUrl(c);
+            const isPartyList = mapType === 'party';
+            
+            // ดึงสีพรรคของผู้สมัครรายนี้
+            const pColor = partyColors[c.party_name] || '#888888';
+            const textColor = getPartyTextColor(c.party_name);
+            const winnerBg = hexToRgba(pColor, 0.12);
+
+            html += `
+              <div class="cand-card ${c.win ? 'winner' : ''}" style="${c.win ? `border-left: 4px solid ${pColor}; background:${winnerBg};` : ''}">
+                <div class="avatar-wrapper">
+                  <img class="cand-avatar" src="${imgUrl}" alt="${c.party_name}" style="border: 2px solid ${pColor};" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(c.party_name)}&background=eee&color=333'">
+                  ${c.win ? `<span class="winner-badge" style="background:${pColor};">🏆</span>` : ''}
+                </div>
+                <div class="cand-info">
+                  <div style="font-size:11px; color:#64748b;">
+                    อันดับ ${c.rank} ${c.bigfam === 'ใช่' ? '<span class="bigfam-badge">🏠 บ้านใหญ่</span>' : ''}
+                  </div>
+                  <div style="font-size:14px; font-weight:bold; margin-top:1px; color:#1e293b;">
+                    ${isPartyList ? 'พรรค' + c.party_name : 'หมายเลข ' + (c['หมายเลขผู้สมัคร'] || '-') + ': ' + c['ชื่อ-ชื่อสกุล']}
+                  </div>
+                  ${!isPartyList ? `<div style="font-size:12px; color:#475569;">พรรค${c.party_name}</div>` : ''}
+                  <div style="font-size:16px; font-weight:bold; color:${textColor}; margin-top:2px;">
+                    ${c.votes_num.toLocaleString()} <span style="font-size:11px; color:#64748b;">คะแนน (${c.percent})</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        sidebar.html(html);
+      });
+
+    // ข้อความระบุเลขเขต
+    groups.append("text")
+      .attr("class", "label")
+      .attr("x", boxSize / 2)
+      .attr("y", boxSize / 2)
+      .text(d => d.zone);
+  }
+
+  function applyFilter(type, val, btn) {
+    d3.selectAll(".filter-btn").classed("active", false);
+    d3.select(btn).classed("active", true);
+
+    d3.selectAll(".zone-group").classed("dimmed", d => {
+      if (!d) return false;
+      if (val === 'all') return false;
+      if (type === 'bigfam') {
+        return val === 'ใช่' ? !d.isBigFam : false;
+      }
+      if (type === 'region') return d.region !== val;
+      if (type === 'party') {
+        const partyNow = (currentYearMode === '66') ? d.party66 : d.party69;
+        return !partyNow.includes(val);
+      }
+    });
+
+    d3.selectAll(".prov-label").classed("dimmed", d => {
+      if (!d) return false;
+      if (val === 'all') return false;
+      if (type === 'region') return d.region !== val;
+      return false;
+    });
+  }
+
+  // ดึงไฟล์ CSV อัตโนมัติจากโฟลเดอร์เมื่อโหลดหน้าเว็บ
+  Promise.all([
+    d3.csv("election_result-con_69.csv").catch(() => null),
+    d3.csv("election_result-con_66.csv").catch(() => null),
+    d3.csv("election_result-party_69.csv").catch(() => null),
+    d3.csv("election_result-party_66.csv").catch(() => null)
+  ]).then(([c69, c66, p69, p66]) => {
+    if (c69) dataCon69 = c69;
+    if (c66) dataCon66 = c66;
+    if (p69) dataParty69 = p69;
+    if (p66) dataParty66 = p66;
+    renderCurrentMap();
+  }).catch(err => {
+    console.error("เกิดข้อผิดพลาดในการดึงไฟล์ CSV:", err);
+  });
+</script>
+</body>
+</html>
