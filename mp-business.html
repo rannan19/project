@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ธุรกิจ สส. ตามหมวด</title>
+<meta name="description" content="แผนผังบริษัทที่ สส. ปี 2569 จาก 5 พรรคเกี่ยวข้อง จัดกลุ่มตามหมวดธุรกิจ">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Kanit', sans-serif; display: flex; background: #f7f4ee; margin: 0; padding: 20px; color: #222; font-size: 14px; }
+  button, input, select { font-family: inherit; }
+  [hidden] { display: none !important; }
+
+  #filter-menu { width: 240px; background: #fff; padding: 15px; border-radius: 10px; margin-right: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); height: fit-content; flex-shrink: 0; }
+  #filter-menu h4 { margin: 12px 0 6px; font-size: 14px; }
+  .fm-toggle { display: none; width: 100%; padding: 10px 14px; margin-bottom: 8px; border: 0; border-radius: 8px; background: #2D3748; color: #fff; font-size: 14px; font-weight: bold; justify-content: space-between; align-items: center; cursor: pointer; }
+  .gov-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; margin-bottom: 6px; border-radius: 8px; background: #319795; color: #fff; font-size: 14px; font-weight: bold; text-decoration: none; }
+  .gov-link:hover { background: #2c7a7b; }
+  .back-map { justify-content: flex-start; background: #2D3748; margin-bottom: 8px; }
+  .back-map:hover { background: #1A202C; }
+  /* ชุดลิงก์เดียวกับเมนูของหน้าแผนที่ (index) */
+  .fm-title { background: #f7f4ee; color: #2D3748; text-align: center; font-weight: bold; font-size: 14px; padding: 9px 10px; border-radius: 8px; margin-bottom: 4px; border: 1px solid #e0dcd3; }
+  .fm-links { margin-top: 14px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .fm-links .gov-link { justify-content: center; text-align: center; background: #2D3748; margin-bottom: 8px; font-size: 13px; }
+  .fm-links .gov-link:last-child { margin-bottom: 0; }
+  .fm-links .gov-link:hover { background: #1A202C; }
+  .fm-links .gov-link.current { background: #fff; color: #2D3748; box-shadow: inset 0 0 0 2px #2D3748; cursor: default; }
+  button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid #2D3748; outline-offset: 2px; }
+  .filter-btn { display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 6px; cursor: pointer; text-align: left; font-size: 13px; color: #222; }
+  .filter-btn:hover { background: #f0f0f0; }
+  .filter-btn.active { background: #4A5568; color: #fff; border-color: #4A5568; }
+  .filter-btn.active .count-pill { background: rgba(255,255,255,.25); color: #fff; }
+  .filter-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .count-pill { background: #EDF2F7; color: #4A5568; font-size: 11px; padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }
+  .tg-select, .search-input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff; font-size: 13px; color: #2d3748; }
+  .switch { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0 6px; cursor: pointer; }
+  .switch input { width: 16px; height: 16px; accent-color: #4A5568; }
+  .search-wrap { position: relative; }
+  #search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1000; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.16); max-height: 320px; overflow-y: auto; }
+  .search-item { display: block; width: 100%; padding: 8px 10px; background: none; border: 0; border-bottom: 1px solid #f1f5f9; text-align: left; cursor: pointer; font-size: 13px; color: #222; }
+  .search-item:hover, .search-item.cursor { background: #EDF2F7; }
+  .search-item small { display: block; color: #718096; font-size: 11px; }
+  .search-empty { padding: 10px; color: #718096; font-size: 12px; }
+  .accordion-header { width: 100%; padding: 10px 14px; background: #2D3748; color: #fff; border: 0; border-radius: 8px; cursor: pointer; text-align: left; font-size: 14px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; }
+  .accordion-header .arrow { font-size: 11px; transition: transform .3s; }
+  .accordion-header.active .arrow { transform: rotate(180deg); }
+  .accordion-content { display: none; }
+  .accordion-content.open { display: block; }
+  .notes { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.55; color: #4A5568; }
+  .notes li { margin-bottom: 6px; }
+  .reset-btn { display: block; width: 100%; padding: 8px; margin-top: 8px; border: 1px solid #718096; background: #fff; color: #4A5568; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; }
+  .reset-btn:hover { background: #f0f0f0; }
+
+  #map-container { position: sticky; top: 20px; align-self: flex-start; flex: 1 1 0; min-width: 0; }
+  .map-wrapper { position: relative; height: calc(100vh - 40px); min-height: 480px; border-radius: 8px; border: 1px solid #e0dcd3; overflow: hidden; display: flex; flex-direction: column; background: #f7f4ee; }
+  .map-header { background: #2c3e50; color: #fff; text-align: center; padding: 6px 10px; font-size: 13px; font-weight: bold; }
+  .map-sub { background: #fff8e6; color: #744210; text-align: center; padding: 4px 10px; font-size: 11.5px; border-bottom: 1px solid #f3e2b3; }
+  #graph { display: block; width: 100%; flex: 1 1 0; min-height: 0; cursor: grab; touch-action: none; }
+  #graph:active { cursor: grabbing; }
+  .zoom-controls { position: absolute; bottom: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 50; }
+  .zoom-btn { width: 36px; height: 36px; background: #fff; border: 1px solid #ccc; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.15); color: #222; display: flex; align-items: center; justify-content: center; }
+  .zoom-btn:hover { background: #f0f0f0; }
+  #msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); background: #fff; border-radius: 8px; padding: 10px 14px; box-shadow: 0 2px 8px rgba(0,0,0,.12); color: #4A5568; text-align: center; font-size: 13px; max-width: 85%; }
+
+  .edge line { vector-effect: non-scaling-stroke; fill: none; }
+  .edge .vis { stroke-width: 1.2; stroke-opacity: .55; }
+  .edge.director .vis { stroke-dasharray: 4 3; }
+  .edge.other .vis { stroke: #A0AEC0 !important; stroke-dasharray: 1 3; stroke-linecap: round; stroke-opacity: .9; }
+  .edge .hit { stroke: transparent; stroke-width: 10; cursor: pointer; }
+  .edge.hl .vis { stroke-width: 2.4; stroke-opacity: 1; }
+  .edge.sel .vis { stroke-width: 3.4; stroke-opacity: 1; }
+  .node { cursor: pointer; }
+  .node .shape { vector-effect: non-scaling-stroke; }
+  .node.mp .shape { stroke: #fff; stroke-width: 1.4; }
+  .node.cat .shape { fill: #2D3748; stroke: #fff; stroke-width: 2; }
+  .node.cat text { font-size: calc(13.5px * var(--ik, 1)) !important; font-weight: 700; stroke-width: calc(4px * var(--ik, 1)) !important; fill: #1A202C; }
+  .edge.catlink .vis { stroke-width: 1; stroke-opacity: .35; stroke-dasharray: none; }
+  .edge.catlink.hl .vis { stroke-width: 1.8; stroke-opacity: .9; }
+  .node.mp .ring { fill: none; stroke: #B7791F; stroke-width: 1.6; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+  .node.company .shape { stroke-width: 1.3; }
+  .node.person .shape { fill: #CBD5E0; stroke: #fff; stroke-width: 1; }
+  .node .gov { fill: #DD6B20; stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .node.sel .shape { stroke: #000 !important; stroke-width: 3; }
+  .node text { pointer-events: none; fill: #222; paint-order: stroke fill; stroke: #f7f4ee; stroke-linejoin: round; display: none; }
+  .node.mp text { font-size: calc(12px * var(--ik, 1)); stroke-width: calc(3px * var(--ik, 1)); font-weight: 600; }
+  .node.company text, .node.person text, .node.cat text { font-size: calc(10.5px * var(--ik, 1)); stroke-width: calc(3px * var(--ik, 1)); }
+  #graph.lbl-mp .node.mp text, #graph.lbl-mp .node.cat text, #graph.lbl-all .node text, .node.hl text, .node.sel text { display: block; }
+  .node.dim text, .node.lbl-x text { display: none !important; }
+  .party-label { pointer-events: none; text-anchor: middle; font-weight: 700; font-size: calc(15px * var(--ik, 1)); paint-order: stroke fill; stroke: #f7f4ee; stroke-width: calc(5px * var(--ik, 1)); }
+  .off { opacity: .06 !important; pointer-events: none !important; }
+  .dim { opacity: .14; }
+  .legend { position: absolute; left: 10px; bottom: 10px; background: rgba(255,255,255,.95); border: 1px solid #e0dcd3; border-radius: 8px; padding: 6px 10px; font-size: 11px; z-index: 40; max-width: calc(100% - 20px); }
+  .legend summary { cursor: pointer; font-weight: 600; font-size: 12px; }
+  .legend-row { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+  .legend svg { flex-shrink: 0; }
+
+  #tooltip { position: fixed; display: none; background: #fff; border-radius: 8px; padding: 9px 11px; box-shadow: 0 4px 15px rgba(0,0,0,.2); pointer-events: none; font-size: 12px; z-index: 9999; max-width: 280px; border: 1px solid #eee; line-height: 1.45; }
+  #tooltip .muted { color: #718096; }
+
+  #sidebar { display: none; width: 380px; background: #f0ece1; padding: 20px; border-radius: 12px; margin-left: 20px; flex-shrink: 0; max-height: calc(100vh - 40px); overflow-y: auto; border: 1px solid #e2ddd0; position: sticky; top: 20px; align-self: flex-start; }
+  #sidebar.open { display: block; }
+  #sidebar h2 { margin: 0 38px 4px 0; font-size: 20px; line-height: 1.25; color: #1e293b; }
+  #sidebar h3 { margin: 16px 0 7px; font-size: 14px; color: #2D3748; }
+  .close-btn { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #d6d0c1; background: #fff; cursor: pointer; font-size: 15px; color: #4A5568; }
+  .sub { color: #5b6472; font-size: 12.5px; margin-bottom: 6px; line-height: 1.5; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
+  .stat { background: #fff; border: 1px solid #e8e3d6; border-radius: 8px; padding: 8px 6px; text-align: center; }
+  .stat b { display: block; font-size: 17px; color: #1e293b; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 11px; color: #5b6472; line-height: 1.25; display: block; }
+  .badge { display: inline-block; font-size: 10.5px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin: 2px 3px 2px 0; border: 1px solid transparent; }
+  .b-sh { background: #EBF8FF; color: #2B6CB0; border-color: #BEE3F8; }
+  .b-dir { background: #FAF5FF; color: #6B46C1; border-color: #E9D8FD; }
+  .b-active { background: #F0FFF4; color: #276749; border-color: #9AE6B4; }
+  .b-closed { background: #EDF2F7; color: #4A5568; border-color: #E2E8F0; }
+  .b-gov { background: #FFFAF0; color: #C05621; border-color: #FBD38D; }
+  .b-check { background: #FFFAF0; color: #975A16; border-color: #FBD38D; }
+  .card { background: #fff; border: 1px solid #e8e3d6; border-left: 4px solid #4A5568; border-radius: 6px; padding: 9px 10px; margin-bottom: 7px; font-size: 12.5px; line-height: 1.5; }
+  .card .title { font-weight: 600; font-size: 13.5px; }
+  .card .meta { color: #5b6472; font-size: 12px; }
+  .card .num { font-variant-numeric: tabular-nums; }
+  .link-btn { background: none; border: 0; padding: 0; color: #1d4ed8; cursor: pointer; font-size: inherit; font-weight: inherit; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
+  .sort-row { display: flex; gap: 6px; align-items: center; font-size: 12px; color: #5b6472; margin-bottom: 6px; }
+  .sort-row select { padding: 4px 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 12px; background: #fff; }
+  table.fin { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; background: #fff; border-radius: 6px; overflow: hidden; }
+  table.fin th, table.fin td { padding: 5px 7px; text-align: right; border-bottom: 1px solid #eee7d8; }
+  table.fin th:first-child, table.fin td:first-child { text-align: left; }
+  table.fin th { background: #f7f4ee; font-weight: 600; color: #4A5568; }
+  .neg { color: #C53030; }
+  .back-btn { background: none; border: 0; padding: 0; margin-bottom: 8px; color: #4A5568; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+  .back-btn:hover { text-decoration: underline; }
+  .cmp { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; border-radius: 8px; overflow: hidden; font-variant-numeric: tabular-nums; }
+  .cmp td:not(:first-child) { white-space: nowrap; }
+  .cmp th, .cmp td { padding: 6px 5px; border-bottom: 1px solid #eee7d8; text-align: right; }
+  .cmp th:first-child, .cmp td:first-child { text-align: left; color: #4A5568; font-weight: 400; }
+  .cmp thead th { background: #f7f4ee; font-weight: 700; color: #1e293b; white-space: nowrap; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+  .insight { background: #fff; border: 1px solid #e8e3d6; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 12.5px; line-height: 1.55; }
+  .seg { display: flex; gap: 4px; margin: 2px 0 8px; flex-wrap: wrap; }
+  .seg button { flex: 1; padding: 6px 6px; border: 1px solid #d6d0c1; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; color: #2D3748; white-space: nowrap; }
+  .seg button.on { background: #4A5568; color: #fff; border-color: #4A5568; }
+  .ind { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 5px 4px; border-radius: 6px; cursor: pointer; color: #222; font-size: 12px; }
+  .ind:hover, .ind.on { background: #fff; }
+  .ind .lab { display: flex; justify-content: space-between; gap: 6px; font-weight: 600; margin-bottom: 3px; }
+  .ind .lab span:last-child { font-weight: 400; color: #718096; font-size: 11px; }
+  .bar-row { display: flex; align-items: center; gap: 6px; height: 13px; margin-bottom: 2px; }
+  .bar { height: 9px; border-radius: 0 4px 4px 0; min-width: 2px; }
+  .stack { display: flex; gap: 2px; height: 11px; flex: 0 1 auto; min-width: 2px; }
+  .stack span { display: block; height: 100%; }
+  .stack span:last-child { border-radius: 0 4px 4px 0; }
+  .bar-val { font-size: 11px; color: #4A5568; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rank-list { list-style: none; margin: 0; padding: 0; counter-reset: r; }
+  .rank-list li { background: #fff; border: 1px solid #e8e3d6; border-left: 4px solid #4A5568; border-radius: 6px; padding: 7px 9px; margin-bottom: 5px; font-size: 12.5px; line-height: 1.45; }
+  .rank-list .v { float: right; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 8px; }
+  .caveat { font-size: 11.5px; color: #744210; background: #fff8e6; border: 1px solid #f3e2b3; border-radius: 6px; padding: 6px 8px; margin: 6px 0; line-height: 1.45; }
+  .tabs { display: flex; gap: 4px; margin: 0 0 12px; background: #e6e0d1; padding: 3px; border-radius: 8px; }
+  .tabs button { flex: 1; border: 0; background: transparent; padding: 7px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: #4A5568; }
+  .tabs button.on { background: #fff; color: #1e293b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .disclaimer { font-size: 12px; color: #9B2C2C; background: #FFF5F5; border: 1px solid #FEB2B2; border-radius: 6px; padding: 7px 9px; margin: 0 0 10px; line-height: 1.5; }
+  .small-n { font-size: 10px; color: #975A16; background: #FFFAF0; border: 1px solid #FBD38D; border-radius: 3px; padding: 0 4px; margin-left: 3px; white-space: nowrap; }
+  .pos { color: #276749; } .negv { color: #C53030; }
+  .chart-wrap { background: #fff; border: 1px solid #e8e3d6; border-radius: 8px; padding: 8px 6px 4px; position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart-wrap .pt { cursor: default; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: #4A5568; padding: 4px 4px 2px; }
+  .chart-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+  .meter { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 4px 0; }
+  .meter span { display: block; height: 100%; }
+  .source { font-size: 11px; color: #6b7280; margin-top: 14px; border-top: 1px solid #ddd6c6; padding-top: 8px; line-height: 1.5; }
+
+  @media (max-width: 1000px) {
+    body { flex-direction: column; padding: 8px; }
+    #filter-menu { width: auto; margin: 0 0 8px; padding: 10px; }
+    .fm-toggle { display: flex; }
+    #filter-menu.fm-collapsed > *:not(#fm-toggle):not(.back-map) { display: none !important; }
+    #filter-menu.fm-collapsed .fm-toggle { margin-bottom: 0; }
+    #filter-menu.fm-collapsed .back-map { margin: 8px 0 0; }
+    #map-container { position: relative; top: auto; flex: none; width: 100%; }
+    .map-wrapper { height: min(140vw, 80vh); min-height: 420px; }
+    .zoom-btn { width: 40px; height: 40px; }
+    #sidebar.summary { position: static; max-height: none; width: auto; margin: 8px 0 0; border-radius: 12px; box-shadow: none; z-index: auto; }
+    #sidebar { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; margin: 0; max-height: 55vh; border-radius: 16px 16px 0 0; z-index: 900; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 18px rgba(0,0,0,.22); }
+    .close-btn { width: 40px; height: 40px; top: 8px; right: 8px; }
+  }
+  @media (hover: none) { #tooltip { display: none !important; } }
+</style>
+</head>
+<body>
+<nav id="filter-menu" aria-label="ตัวกรอง">
+  <button type="button" id="fm-toggle" class="fm-toggle" aria-expanded="true">⚙️ ตัวกรอง <span id="fm-arrow">▲ ซ่อน</span></button>
+  <a class="gov-link back-map" href="index.html"><span aria-hidden="true">←</span><span>กลับแผนที่ผลเลือกตั้ง</span></a>
+  <div class="fm-title">ความเกี่ยวข้องกับธุรกิจของนักการเมือง</div>
+
+  <h4>🔎 ค้นหา</h4>
+  <div class="search-wrap">
+    <input id="search" class="search-input" type="search" autocomplete="off" placeholder="สส. บริษัท หมวดธุรกิจ หรือเลขนิติบุคคล" aria-label="ค้นหา สส. บริษัท หรือเลขนิติบุคคล">
+    <div id="search-results" hidden></div>
+  </div>
+
+  <h4>👤 ประเภท สส.</h4><div id="f-type"></div>
+  <h4>🏢 สถานะบริษัท</h4><div id="f-status"></div>
+  <h4>🏛️ พรรค ปี 2569</h4><select id="f-party" class="tg-select" aria-label="กรองตามพรรค"></select>
+  <h4>🏷️ หมวดธุรกิจ</h4><select id="f-cat" class="tg-select" aria-label="กรองตามหมวดธุรกิจ"></select>
+
+  <button type="button" class="accordion-header" data-acc="acc-more">ตัวกรองเพิ่มเติม <span class="arrow">▼</span></button>
+  <div class="accordion-content" id="acc-more">
+    <div id="f-gov"></div>
+    <h4>การจับคู่ชื่อ</h4><div id="f-match"></div>
+  </div>
+  <button type="button" class="accordion-header" data-acc="acc-notes">อ่านแผนผังนี้อย่างไร <span class="arrow">▼</span></button>
+  <div class="accordion-content" id="acc-notes">
+    <ul class="notes">
+      <li>ข้อมูลมาจากไฟล์ business_v6.xlsx ซึ่งรวมบริษัทที่ผู้สมัคร สส. ปี 2566 เกี่ยวข้อง หน้านี้แสดงเฉพาะ สส. ปี 2569 ของภูมิใจไทย ประชาชน เพื่อไทย กล้าธรรม และประชาธิปัตย์</li>
+      <li>วงกลมสีเข้มคือหมวดธุรกิจ สี่เหลี่ยมรอบ ๆ คือบริษัทในหมวดนั้น สีของบริษัทคือพรรคของ สส. ที่เกี่ยวข้อง</li>
+      <li>หน้านี้แสดงเฉพาะความเกี่ยวข้องของตัวบุคคลเอง ไฟล์ไม่มีข้อมูลคู่สมรส บุตร หรือญาติ</li>
+      <li>สส. ที่ไม่ได้ลงสมัครปี 2566 จะไม่อยู่ในไฟล์ การไม่ปรากฏจึงไม่ได้แปลว่าไม่มีธุรกิจ</li>
+      <li>สส. บัญชีรายชื่อใช้การระบุในไฟล์ ส่วน สส. เขตจับคู่ชื่อกับผลเลือกตั้งปี 2569 รายที่จังหวัดไม่ตรงหรือไม่มีข้อมูลจังหวัดจะติดป้าย "ต้องตรวจสอบ"</li>
+      <li>หน้านี้ไม่ระบุว่า สส. แต่ละคนเกี่ยวข้องกับบริษัทในลักษณะใด และไม่แสดงสัดส่วนหรือมูลค่าหุ้นรายคน</li>
+      <li>การเกี่ยวข้องกับบริษัทไม่ได้แปลว่าทำผิดหรือมีผลประโยชน์ทับซ้อน</li>
+      <li>บริษัทที่เลิกกิจการหรือเป็นบริษัทร้างยังแสดงอยู่ เพื่อให้เห็นประวัติ</li>
+    </ul>
+  </div>
+  <button type="button" id="reset" class="reset-btn">ล้างตัวกรองทั้งหมด</button>
+
+  <div class="fm-links" aria-label="หน้าอื่นในโครงการ">
+    <a class="gov-link" href="index.html"><span>แผนที่ผลเลือกตั้ง</span></a>
+    <a class="gov-link current" href="mp-business.html" aria-current="page"><span>ความเกี่ยวข้องกับธุรกิจของนักการเมือง</span></a>
+    <a class="gov-link" href="coalition.html"><span>ทดลองจับขั้วรัฐบาล</span></a>
+    <a class="gov-link" href="party-timeline.html"><span>เส้นทางพรรคของ สส.</span></a>
+  </div>
+</nav>
+
+<main id="map-container">
+  <div class="map-wrapper">
+    <div class="map-header" id="title">กำลังโหลดข้อมูล…</div>
+    <div class="map-sub">แสดงบริษัทที่ สส. เกี่ยวข้องตามข้อมูลในไฟล์ ไม่ระบุลักษณะความเกี่ยวข้อง และไม่ได้บ่งชี้การกระทำผิด</div>
+    <svg id="graph" role="img" aria-label="แผนผังบริษัทของ สส. จัดกลุ่มตามหมวดธุรกิจ"></svg>
+    <div class="zoom-controls">
+      <button type="button" class="zoom-btn" id="z-in" aria-label="ซูมเข้า">+</button>
+      <button type="button" class="zoom-btn" id="z-out" aria-label="ซูมออก">−</button>
+      <button type="button" class="zoom-btn" id="z-fit" aria-label="พอดีจอ">↺</button>
+    </div>
+    <div id="msg" hidden></div>
+    <details class="legend" id="legend">
+      <summary>สัญลักษณ์</summary>
+      <div class="legend-row"><svg width="30" height="18"><circle cx="15" cy="9" r="8" fill="#2D3748"/></svg>หมวดธุรกิจ (ขนาดตามจำนวนบริษัท)</div>
+      <div id="legend-parties"></div>
+      <div class="legend-row"><svg width="30" height="14"><rect x="9" y="1" width="12" height="12" rx="2" fill="#fff" stroke="#4A5568" stroke-width="1.8"/></svg>กรอบโปร่ง: เลิก ร้าง หรือปิดแล้ว</div>
+      <div class="legend-row"><svg width="30" height="14"><rect x="9" y="1" width="12" height="12" rx="2" fill="#A0AEC0"/><circle cx="21" cy="2.5" r="3" fill="#DD6B20" stroke="#fff"/></svg>มีโครงการภาครัฐ</div>
+      <div class="legend-row" style="color:#5b6472">ขนาดบริษัทตามรายได้ล่าสุด</div>
+    </details>
+  </div>
+</main>
+<aside id="sidebar" aria-live="polite"></aside>
+<div id="tooltip" role="tooltip"></div>
+
+<script>
+(function () {
+  const BUSINESS_CSV = 'business_v6.csv';
+  // ไฟล์ v6 ใช้ชื่อหมวดธุรกิจสองแบบปนกัน (ชื่อเต็มตาม TSIC กับชื่อย่อ) จึงรวมเป็นชื่อย่อชุดเดียว
+  const CAT_ALIAS = {
+    'การขายส่งและการขายปลีก การซ่อมยานยนต์และจักรยานยนต์': 'ขายส่ง ขายปลีก ซ่อมยานยนต์', 'กิจกรรมอสังหาริมทรัพย์': 'อสังหาริมทรัพย์',
+    'กิจกรรมทางวิชาชีพ วิทยาศาสตร์ และเทคนิค': 'วิชาชีพ วิทยาศาสตร์ เทคนิค', 'กิจกรรมการบริหารและการบริการสนับสนุน': 'บริหารและบริการสนับสนุน',
+    'ที่พักแรมและบริการด้านอาหาร': 'ที่พัก ร้านอาหาร', 'การขนส่งและสถานที่เก็บสินค้า': 'ขนส่ง คลังสินค้า', 'ข้อมูลข่าวสารและการสื่อสาร': 'ข้อมูลข่าวสาร การสื่อสาร',
+    'กิจกรรมทางการเงินและการประกันภัย': 'การเงิน ประกันภัย', 'ศิลปะ ความบันเทิง และนันทนาการ': 'ศิลปะ บันเทิง นันทนาการ', 'เกษตรกรรม การป่าไม้ และการประมง': 'เกษตรกรรม ป่าไม้ ประมง',
+    'ไฟฟ้า ก๊าซ ไอน้ำ และระบบปรับอากาศ': 'ไฟฟ้า ก๊าซ', 'การทำเหมืองแร่และเหมืองหิน': 'เหมืองแร่', 'กิจกรรมบริการด้านอื่นๆ': 'บริการอื่นๆ',
+    'กิจกรรมด้านสุขภาพและงานสังคมสงเคราะห์': 'สุขภาพ สังคมสงเคราะห์', 'การจัดหาน้ำ การจัดการ และการบำบัดน้ำเสีย ของเสีย และสิ่งปฏิกูล': 'น้ำประปา จัดการของเสีย', 'การก่อสร้าง': 'ก่อสร้าง'
+  };
+  const normCat = v => { const t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); return CAT_ALIAS[t] || t || 'ไม่ระบุ'; };
+  const FOCUS_PARTIES = ['ภูมิใจไทย', 'ประชาชน', 'เพื่อไทย', 'กล้าธรรม', 'ประชาธิปัตย์'];
+  const PARTY_SHORT = { 'ภูมิใจไทย': 'ภท.', 'ประชาชน': 'ปชน.', 'เพื่อไทย': 'พท.', 'กล้าธรรม': 'กธ.', 'ประชาธิปัตย์': 'ปชป.' };
+  const short = p => PARTY_SHORT[p] || p;
+  const RESULT_CSV = 'election_result-con_69.csv';
+  const YEARS = [2562, 2563, 2564, 2565, 2566, 2567, 2568];
+  const partyColors = {
+    'ภูมิใจไทย': '#322485', 'ประชาชน': '#FF6411', 'ก้าวไกล': '#F77831', 'เพื่อไทย': '#D60003', 'กล้าธรรม': '#48CB74',
+    'ประชาธิปัตย์': '#01A4E4', 'รวมไทยสร้างชาติ': '#272D80', 'พลังประชารัฐ': '#086A3B', 'ไทรวมพลัง': '#FD318C',
+    'ประชาชาติ': '#A46D06', 'ไทยสร้างไทย': '#5A0F9D', 'ชาติไทยพัฒนา': '#E71485', 'เสรีรวมไทย': '#D8B720', 'โอกาสใหม่': '#F1666B',
+    'ไทยก้าวใหม่': '#F7EB00', 'ประชาธิปไตยใหม่': '#FA5816', 'ประชากรไทย': '#00CED1', 'ไทยภักดี': '#00C13A', 'เศรษฐกิจ': '#FFBE3E',
+    'รวมใจไทย': '#2F855A', 'ทางเลือกใหม่': '#6B46C1'
+  };
+  const PARTY_ALIAS = { 'ไทยรวมพลัง': 'ไทรวมพลัง' };
+  const ACTIVE = 'ยังดำเนินกิจการอยู่';
+  const TITLE_RE = /^(นาย|นางสาว|นาง|น\.ส\.|ว่าที่ร้อยตรี|ว่าที่ ร\.ต\.|ดร\.)\s*/;
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const clean = s => (s == null ? '' : String(s)).trim();
+  const normName = s => clean(s).replace(TITLE_RE, '').replace(/\s+/g, ' ').trim();
+  const normParty = p => { const t = clean(p); return PARTY_ALIAS[t] || t; };
+  const colorOf = p => partyColors[p] || '#718096';
+  const toNum = v => { const t = clean(v).replace(/,/g, ''); if (t === '') return null; const n = Number(t); return isFinite(n) ? n : null; };
+  const fmtBaht = n => {
+    if (n == null) return '–';
+    const a = Math.abs(n), s = n < 0 ? '−' : '';
+    if (a >= 1e9) return s + (a / 1e9).toLocaleString('th-TH', { maximumFractionDigits: 2 }) + ' พันล้าน';
+    if (a >= 1e6) return s + (a / 1e6).toLocaleString('th-TH', { maximumFractionDigits: 1 }) + ' ล้าน';
+    return s + a.toLocaleString('th-TH');
+  };
+  const fmtS = n => { if (n == null) return '–'; const a = Math.abs(n), s = n < 0 ? '−' : ''; if (a >= 1e9) return s + (a / 1e9).toLocaleString('th-TH', { maximumFractionDigits: 2 }) + ' พันล.'; if (a >= 1e5) return s + (a / 1e6).toLocaleString('th-TH', { maximumFractionDigits: 1 }) + ' ล.'; return s + a.toLocaleString('th-TH'); };
+  const fmtPct = n => n == null ? '' : (n >= 1 ? n.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : n.toLocaleString('th-TH', { maximumFractionDigits: 4 })) + '%';
+  const textOn = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) > 165 ? '#222' : '#fff'; };
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dur = ms => reduceMotion ? 0 : ms;
+
+  const DEFAULT = { type: 'all', role: 'all', status: 'all', party: 'all', cat: 'all', gov: 'all', match: 'all', others: true };
+  const state = { f: { ...DEFAULT }, sel: null, hover: null, fitK: 1, k: 1, fitted: true };
+  let baseline = [];
+  let mps = new Map(), companies = new Map(), others = new Map(), cats = new Map(), catLinks = [], edges = [], nodes = [], partyAnchors = [];
+  let svg, root, zoom, edgeSel, nodeSel, labelSel;
+
+  /* ---------- สร้างข้อมูล ---------- */
+  function build(rows, results, mpList, govRows) {
+    const winners = new Map();
+    results.forEach(r => {
+      if (clean(r['ผลการเลือกตั้ง 2569 (Rocket Media Lab)']) !== 'ได้รับเลือก') return;
+      winners.set(normName(r['ชื่อ-ชื่อสกุล']), { prov: clean(r['จังหวัด']), zone: clean(r['เขต']), party: normParty(r['สังกัดพรรค']), img: clean(r['รูปภาพ']) });
+    });
+
+    // ระบุ สส. ปี 2569 ระดับบุคคล
+    const people = new Map();
+    rows.forEach(r => {
+      const pid = clean(r['รหัสบุคคล']); if (!pid || people.has(pid)) return;
+      const name = clean(r['ชื่อ-สกุล']), flagged = clean(r['ส.ส. 2569']) === 'ใช่', win = winners.get(normName(name));
+      let mp = null;
+      if (flagged) mp = { kind: 'list', party: normParty(r['พรรค 2569']), rank: clean(r['ลำดับบัญชีรายชื่อ 2569']), mpId: clean(r['รหัส ส.ส. 2569']), match: 'file' };
+      else if (win) {
+        const p66 = clean(r['จังหวัด (ปี 2566)']);
+        mp = { kind: 'zone', party: win.party, prov: win.prov, zone: win.zone, img: win.img, match: p66 && p66 === win.prov ? 'name_prov' : 'name_only', prov66: p66 };
+      }
+      people.set(pid, { pid, name, title: clean(r['คำนำหน้า']), party66: clean(r['พรรค (ปี 2566)']), prov66: clean(r['จังหวัด (ปี 2566)']), exMp62: clean(r['อดีต ส.ส./ครม. 62']) === 'ใช่', mp });
+    });
+
+    // รวมแถวบุคคล–บริษัท
+    const links = new Map(), coRows = new Map();
+    rows.forEach(r => {
+      const pid = clean(r['รหัสบุคคล']), cid = clean(r['เลขทะเบียนนิติบุคคล']); if (!pid || !cid) return;
+      if (!coRows.has(cid)) coRows.set(cid, []);
+      coRows.get(cid).push(r);
+      const key = pid + '|' + cid;
+      if (!links.has(key)) links.set(key, { pid, cid, shareholder: false, director: false, holdings: [] });
+      const l = links.get(key);
+      if (clean(r['เป็นผู้ถือหุ้น']) === 'ใช่') {
+        l.shareholder = true;
+        const h = { pct: toNum(r['% ถือหุ้น']), value: toNum(r['มูลค่าหุ้นที่ถือ ปี 2566 (บาท)']) };
+        if (!l.holdings.some(x => x.pct === h.pct && x.value === h.value)) l.holdings.push(h);
+      }
+      if (clean(r['เป็นกรรมการ']) === 'ใช่') l.director = true;
+    });
+
+    const mpIds = new Set([...people.values()].filter(p => p.mp && FOCUS_PARTIES.includes(p.mp.party)).map(p => p.pid));
+    const mpCompanyIds = new Set([...links.values()].filter(l => mpIds.has(l.pid)).map(l => l.cid));
+
+    // บริษัท: ใช้แถวที่มีข้อมูลงบมากที่สุด
+    const anyMp = new Set([...people.values()].filter(p => p.mp).map(p => p.pid));
+    baseline = [];
+    coRows.forEach((list, cid) => {
+      if (mpCompanyIds.has(cid) || list.some(r => anyMp.has(clean(r['รหัสบุคคล'])))) return;
+      const r = list[0], rev = {};
+      YEARS.forEach(y => { rev[y] = toNum(r['รายได้รวม ' + y]); });
+      baseline.push({ cat: normCat(r['หมวดธุรกิจ']), rev, p2567: toNum(r['กำไร(ขาดทุน)สุทธิ 2567']) });
+    });
+    mpCompanyIds.forEach(cid => {
+      const list = coRows.get(cid);
+      const best = list.slice().sort((a, b) => YEARS.filter(y => toNum(b['รายได้รวม ' + y]) != null).length - YEARS.filter(y => toNum(a['รายได้รวม ' + y]) != null).length)[0];
+      const latest = toNum(best['ปีที่มีงบล่าสุด']);
+      const fin = YEARS.map(y => ({ y, rev: toNum(best['รายได้รวม ' + y]), profit: toNum(best['กำไร(ขาดทุน)สุทธิ ' + y]), assets: toNum(best['มูลค่าบริษัท ' + y]) }))
+        .filter(f => (latest ? f.y <= latest : true) && (f.rev != null || f.profit != null || f.assets != null))
+        .filter(f => latest || f.rev || f.profit || f.assets);
+      const lastRev = fin.slice().reverse().find(f => f.rev != null);
+      const names = [...new Set(list.map(r => clean(r['บริษัท'])).filter(Boolean))];
+      companies.set(cid, {
+        type: 'company', id: 'co:' + cid, cid, name: names[0], altNames: names.slice(1), cat: normCat(best['หมวดธุรกิจ']),
+        status: clean(best['สถานะกิจการ']), size: clean(best['ขนาดธุรกิจ']), capital: toNum(best['ทุนจดทะเบียน (บาท)']), latest,
+        fin, lastRev: lastRev ? lastRev : null, ticker: clean((list.find(r => clean(r['ชื่อหุ้น (Ticker)'])) || {})['ชื่อหุ้น (Ticker)']), market: clean((list.find(r => clean(r['ตลาด'])) || {})['ตลาด']), price: toNum((list.find(r => clean(r['มูลค่าหุ้นปัจจุบัน (บาท/หุ้น)'])) || {})['มูลค่าหุ้นปัจจุบัน (บาท/หุ้น)']), govN: toNum(best['จำนวนโครงการรัฐ']) || 0, govV: toNum(best['มูลค่าโครงการรัฐรวม (บาท)']) || 0, edges: []
+      });
+    });
+
+    // โหนดบุคคล
+    people.forEach(p => {
+      if (p.mp && FOCUS_PARTIES.includes(p.mp.party)) mps.set(p.pid, { type: 'mp', id: 'mp:' + p.pid, ...p, party: p.mp.party, edges: [] });
+    });
+    links.forEach(l => {
+      if (!mpCompanyIds.has(l.cid)) return;
+      const co = companies.get(l.cid);
+      let person = mps.get(l.pid), kind = 'mp';
+      if (!person) {
+        kind = 'other';
+        if (!others.has(l.pid)) { const p = people.get(l.pid); others.set(l.pid, { type: 'person', id: 'pe:' + l.pid, ...p, edges: [] }); }
+        person = others.get(l.pid);
+      }
+      const e = { id: 'edge:' + l.pid + '|' + l.cid, kind, source: person, target: co, ...l };
+      edges.push(e); person.edges.push(e); co.edges.push(e);
+    });
+    mps.forEach(m => { m.r = 6 + Math.sqrt(m.edges.length) * 2.6; m.needsCheck = m.mp.match === 'name_only'; });
+    companies.forEach(c => {
+      c.active = c.status === ACTIVE;
+      const rev = c.lastRev && c.lastRev.rev > 0 ? c.lastRev.rev : 0;
+      c.r = 3.5 + Math.min(9, Math.sqrt(rev / 5e6));
+      c.mps = c.edges.filter(e => e.kind === 'mp').map(e => e.source);
+      // สีบริษัทตามพรรคของ สส. (ถ้ามีหลายพรรค ใช้พรรคที่มี สส. มากที่สุด)
+      const pc = d3.rollups(c.mps, v => v.length, m => m.party).sort((a, b) => b[1] - a[1] || FOCUS_PARTIES.indexOf(a[0]) - FOCUS_PARTIES.indexOf(b[0]));
+      c.party = pc[0][0]; c.parties = pc.map(x => x[0]);
+    });
+    others.forEach(o => { o.r = 3.5; });
+    // หมวดธุรกิจเป็นศูนย์กลางของแต่ละกลุ่ม
+    companies.forEach(c => {
+      if (!cats.has(c.cat)) cats.set(c.cat, { type: 'cat', id: 'cat:' + c.cat, name: c.cat, companies: [], links: [], edges: [] });
+      const h = cats.get(c.cat), l = { id: 'cl:' + c.cid, source: h, target: c };
+      h.companies.push(c); h.links.push(l); c.catNode = h; c.catLink = l; catLinks.push(l);
+    });
+    cats.forEach(h => { h.r = 9 + Math.sqrt(h.companies.length) * 1.8; });
+    nodes = [...cats.values(), ...companies.values()];
+
+    // โครงการภาครัฐรายสัญญา (แท็บโครงการรัฐ) แทนยอดรวมในแท็บหลัก ซึ่งนับซ้ำตามจำนวนบุคคลในบริษัท
+    state.govDetail = Array.isArray(govRows) && govRows.length > 0;
+    if (state.govDetail) {
+      const byCo = d3.group(govRows, r => clean(r['เลขทะเบียนนิติบุคคล']));
+      companies.forEach(c => {
+        const list = (byCo.get(c.cid) || []).map(r => ({ name: clean(r['ชื่อโครงการ']), agency: clean(r['หน่วยงาน']), sub: clean(r['หน่วยงานย่อย']), method: clean(r['วิธีจัดหา']), year: toNum(r['ปีงบประมาณ']), value: toNum(r['มูลค่าสัญญา (บาท)']) || 0, prov: clean(r['จังหวัด']) }));
+        if (list.length) { c.contracts = list; c.govN = list.length; c.govV = d3.sum(list, x => x.value); }
+        else if (c.govN) { c.contracts = []; c.govFallback = true; }
+        else c.contracts = [];
+      });
+    }
+    // จำนวน สส. ทั้งพรรค: เขตจากผลเลือกตั้ง บัญชีรายชื่อจากแท็บ ส.ส. 2569
+    state.seats = {};
+    FOCUS_PARTIES.forEach(p => {
+      const zone = [...winners.values()].filter(w => w.party === p).length;
+      const listRows = (mpList || []).filter(r => normParty(r['พรรค 2569']) === p);
+      state.seats[p] = { zone, list: listRows.length, listWithCo: listRows.filter(r => (toNum(r['จำนวนแถวในแท็บนักการเมือง-บริษัท']) || 0) > 0).length };
+    });
+  }
+
+  /* ---------- วางตำแหน่ง: แยกกลุ่มตามหมวดธุรกิจ ---------- */
+  function layout() {
+    const rnd = d3.randomLcg(2569);
+    // จัดพื้นที่ของแต่ละหมวดด้วยวงกลมที่ไม่ทับกัน ขนาดตามจำนวนบริษัท
+    const circles = [...cats.values()].sort((a, b) => b.companies.length - a.companies.length)
+      .map(h => ({ h, r: 34 + Math.sqrt(h.companies.length) * 15 }));
+    d3.packSiblings(circles);
+    circles.forEach(o => { o.h.ax = o.h.x = o.h.fx = o.x * 1.12; o.h.ay = o.h.y = o.h.fy = o.y * 1.12; });
+    companies.forEach(c => {
+      const h = c.catNode, a = rnd() * Math.PI * 2, d = h.r + 10 + rnd() * 30;
+      c.ax = h.ax; c.ay = h.ay; c.x = h.ax + Math.cos(a) * d; c.y = h.ay + Math.sin(a) * d;
+    });
+    const sim = d3.forceSimulation(nodes)
+      .randomSource(rnd)
+      .force('link', d3.forceLink(catLinks.map(l => ({ source: l.source, target: l.target }))).distance(l => l.source.r + l.target.r + 14).strength(.12))
+      .force('charge', d3.forceManyBody().strength(n => n.type === 'cat' ? -60 : -10).distanceMax(110))
+      .force('collide', d3.forceCollide(n => (n.type === 'company' ? n.r * 1.42 + 3 : n.r + 8)).iterations(3))
+      .force('x', d3.forceX(n => n.ax).strength(n => n.type === 'company' ? .07 : 0))
+      .force('y', d3.forceY(n => n.ay).strength(n => n.type === 'company' ? .07 : 0))
+      .stop();
+    for (let i = 0; i < 450; i++) sim.tick();
+    sim.force('x', null).force('y', null).force('link', null).force('charge', null);
+    for (let i = 0; i < 60; i++) sim.tick(); // รอบท้าย: แก้การทับกันอย่างเดียว
+    cats.forEach(h => { delete h.fx; delete h.fy; h.topOff = d3.min(h.companies, c => c.y - c.r * 1.42) - h.y; h.topOff = Math.min(h.topOff, -h.r); });
+    partyAnchors = [];
+  }
+
+  /* ---------- ตัวกรอง ---------- */
+  function mpPass(m, f, skip) {
+    if (skip !== 'type' && f.type !== 'all' && m.mp.kind !== f.type) return false;
+    if (skip !== 'party' && f.party !== 'all' && m.party !== f.party) return false;
+    if (skip !== 'match' && f.match !== 'all' && (f.match === 'check') !== m.needsCheck) return false;
+    return true;
+  }
+  function edgePass(e, f, skip) {
+    if (e.kind !== 'mp') return false;
+    if (!mpPass(e.source, f, skip)) return false;
+    const c = e.target;
+    if (skip !== 'role' && f.role === 'shareholder' && !e.shareholder) return false;
+    if (skip !== 'role' && f.role === 'director' && !e.director) return false;
+    if (skip !== 'status' && f.status !== 'all' && c.active !== (f.status === 'active')) return false;
+    if (skip !== 'cat' && f.cat !== 'all' && c.cat !== f.cat) return false;
+    if (skip !== 'gov' && f.gov === 'yes' && !c.govN) return false;
+    return true;
+  }
+  const facetMpCount = (facet, test) => new Set(edges.filter(e => edgePass(e, state.f, facet) && test(e)).map(e => e.source.pid)).size;
+  const FACETS = {
+    type: [['all', 'ทั้งหมด', () => true], ['list', 'บัญชีรายชื่อ', e => e.source.mp.kind === 'list'], ['zone', 'แบ่งเขต', e => e.source.mp.kind === 'zone']],
+    role: [['all', 'ทั้งหมด', () => true], ['shareholder', 'ถือหุ้น', e => e.shareholder], ['director', 'เป็นกรรมการ', e => e.director]],
+    status: [['all', 'ทั้งหมด', () => true], ['active', 'ยังดำเนินกิจการ', e => e.target.active], ['closed', 'เลิก ร้าง หรือปิดแล้ว', e => !e.target.active]],
+    gov: [['all', 'ทุกบริษัท', () => true], ['yes', 'มีโครงการภาครัฐ', e => e.target.govN > 0]],
+    match: [['all', 'ทั้งหมด', () => true], ['ok', 'ระบุในไฟล์ หรือชื่อและจังหวัดตรง', e => !e.source.needsCheck], ['check', 'ต้องตรวจสอบ', e => e.source.needsCheck]]
+  };
+  function renderFacet(facet, host) {
+    document.getElementById(host).innerHTML = FACETS[facet].map(([v, label, test]) => {
+      const n = facetMpCount(facet, test), on = state.f[facet] === v;
+      return `<button type="button" class="filter-btn${on ? ' active' : ''}" data-facet="${facet}" data-val="${v}" aria-pressed="${on}"${!n && !on ? ' disabled' : ''}><span>${esc(label)}</span><span class="count-pill" title="จำนวน สส.">${n} คน</span></button>`;
+    }).join('');
+  }
+  function renderSelect(id, facet, values, allLabel, test) {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="all">${esc(allLabel)}</option>` + values.map(v => {
+      const n = facetMpCount(facet, e => test(e, v));
+      return `<option value="${esc(v)}"${!n && state.f[facet] !== v ? ' disabled' : ''}>${esc(v)} (${n} คน)</option>`;
+    }).join('');
+    el.value = state.f[facet];
+  }
+  function renderFilters() {
+    renderFacet('type', 'f-type'); renderFacet('status', 'f-status');
+    renderFacet('gov', 'f-gov'); renderFacet('match', 'f-match');
+    renderSelect('f-party', 'party', [...new Set([...mps.values()].map(m => m.party))].sort((a, b) => a.localeCompare(b, 'th')), 'ทุกพรรค', (e, v) => e.source.party === v);
+    renderSelect('f-cat', 'cat', [...new Set([...companies.values()].map(c => c.cat))].sort((a, b) => a.localeCompare(b, 'th')), 'ทุกหมวด', (e, v) => e.target.cat === v);
+  }
+
+  /* ---------- วาด ---------- */
+  function draw() {
+    svg = d3.select('#graph'); root = svg.append('g');
+    labelSel = root.append('g').selectAll('text').data(partyAnchors).join('text').attr('class', 'party-label')
+      .attr('x', d => d.lx).attr('y', d => d.ly).style('fill', d => colorOf(d.party) === '#F7EB00' ? '#8A7F00' : colorOf(d.party)).text(d => d.party);
+    edgeSel = root.append('g').attr('pointer-events', 'none').selectAll('g').data(catLinks).join('g').attr('class', 'edge catlink');
+    edgeSel.append('line').attr('class', 'vis').attr('stroke', d => colorOf(d.target.party))
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+
+    const order = { person: 0, company: 1, mp: 2, cat: 3 };
+    nodeSel = root.append('g').selectAll('g').data(nodes.slice().sort((a, b) => order[a.type] - order[b.type])).join('g')
+      .attr('class', d => 'node ' + d.type).attr('transform', d => `translate(${d.x},${d.y})`);
+    nodeSel.each(function (d) {
+      const g = d3.select(this);
+      if (d.type === 'mp') {
+        if (d.needsCheck) g.append('circle').attr('class', 'ring').attr('r', d.r + 3.5);
+        g.append('circle').attr('class', 'shape').attr('r', d.r).attr('fill', colorOf(d.party));
+      } else if (d.type === 'cat') {
+        g.append('circle').attr('class', 'shape').attr('r', d.r);
+      } else if (d.type === 'company') {
+        const pc = colorOf(d.party);
+        g.append('rect').attr('class', 'shape').attr('x', -d.r).attr('y', -d.r).attr('width', d.r * 2).attr('height', d.r * 2).attr('rx', Math.min(3, d.r / 2))
+          .attr('fill', d.active ? pc : '#fff').attr('stroke', d.active ? '#fff' : pc).attr('stroke-width', d.active ? 1 : 1.8);
+        if (d.govN) g.append('circle').attr('class', 'gov').attr('cx', d.r).attr('cy', -d.r).attr('r', 2.6);
+      } else {
+        g.append('circle').attr('class', 'shape').attr('r', d.r);
+      }
+      g.append('text').attr('y', d.r + 12).text(d.type === 'company' ? shortCo(d.name) : d.name);
+    });
+
+    zoom = d3.zoom().scaleExtent([.08, 10]).on('zoom', ev => {
+      root.attr('transform', ev.transform).style('--ik', 1 / ev.transform.k);
+      state.k = ev.transform.k;
+      if (ev.sourceEvent) state.fitted = false;
+      updateLabels();
+    });
+    svg.call(zoom).on('dblclick.zoom', null).on('click', ev => { if (ev.target === svg.node()) select(null); });
+    const bind = sel => sel.on('click', (ev, d) => { ev.stopPropagation(); select(d.id); })
+      .on('mouseenter', (ev, d) => { state.hover = d.id; apply(); showTip(ev, tipFor(d)); })
+      .on('mousemove', moveTip).on('mouseleave', () => { state.hover = null; apply(); hideTip(); });
+    bind(nodeSel);
+    document.getElementById('legend-parties').innerHTML = FOCUS_PARTIES.map(p => `<div class="legend-row"><svg width="30" height="14"><rect x="9" y="1" width="12" height="12" rx="2" fill="${colorOf(p)}"/></svg>บริษัทของ สส. ${esc(p)}</div>`).join('');
+  }
+  const shortCo = n => clean(n).replace(/\s*จำกัด\s*\(มหาชน\)$/, ' (มหาชน)').replace(/^บริษัท\s*/, '').replace(/\s*จำกัด$/, '');
+
+  function fitTransform(list) {
+    const el = svg.node(), w = el.clientWidth, h = el.clientHeight;
+    const pts = list || nodes.filter(n => !n._off);
+    const use = pts.length ? pts : nodes;
+    const x = d3.extent(use, n => n.x), y = d3.extent(use, n => n.y);
+    const k = Math.min(list ? 2.4 : 2, (w - 60) / (x[1] - x[0] + 80), (h - 60) / (y[1] - y[0] + 80));
+    return d3.zoomIdentity.translate(w / 2 - k * (x[0] + x[1]) / 2, h / 2 - k * (y[0] + y[1]) / 2).scale(k);
+  }
+  function fit(animate) {
+    const t = fitTransform(); state.fitted = true; state.fitK = t.k;
+    (animate ? svg.transition().duration(dur(350)) : svg).call(zoom.transform, t);
+  }
+  function focusOn(list) {
+    const t = fitTransform(list); state.fitted = false;
+    const k = Math.min(Math.max(t.k, state.fitK * 2), state.fitK * 4);
+    const el = svg.node(), w = el.clientWidth;
+    let h = el.clientHeight;
+    if (innerWidth <= 1000 && state.sel) {
+      const box = el.getBoundingClientRect(), sheet = document.getElementById('sidebar').getBoundingClientRect();
+      h = Math.max(160, Math.min(h, sheet.top - box.top));
+    }
+    const cx = d3.mean(d3.extent(list, n => n.x)), cy = d3.mean(d3.extent(list, n => n.y));
+    svg.transition().duration(dur(450)).call(zoom.transform, d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(Math.min(k, 6)));
+  }
+
+  /* ---------- แสดงผลตามตัวกรองและการเลือก ---------- */
+  function neighbours(id) {
+    if (!id) return null;
+    const d = find(id); if (!d) return null;
+    const set = new Set([id]);
+    const addCo = c => { set.add(c.id); set.add(c.catLink.id); set.add(c.catNode.id); };
+    if (d.type === 'cat') d.links.forEach(l => { set.add(l.id); set.add(l.target.id); });
+    else if (d.type === 'company') addCo(d);
+    else if (d.edges) d.edges.forEach(e => addCo(e.target));
+    return set;
+  }
+  function apply() {
+    const f = state.f, eOn = new Set();
+    edges.forEach(e => { if (edgePass(e, f)) eOn.add(e.id); });
+    state.eOn = eOn;
+    const coOn = new Set(), mpOn = new Set();
+    edges.forEach(e => { if (eOn.has(e.id)) { coOn.add(e.target.id); mpOn.add(e.source.id); } });
+    companies.forEach(c => { c._off = !coOn.has(c.id); });
+    cats.forEach(h => { h._off = h.companies.every(c => c._off); });
+    mps.forEach(m => { m._off = !mpOn.has(m.id); });
+    const hl = neighbours(state.hover || state.sel);
+    edgeSel.classed('off', d => d.target._off).classed('hl', d => !!hl && hl.has(d.id)).classed('dim', d => !!hl && !hl.has(d.id));
+    nodeSel.classed('off', d => d._off).classed('hl', d => !!hl && hl.has(d.id)).classed('sel', d => d.id === state.sel).classed('dim', d => !!hl && !hl.has(d.id));
+
+    const mpN = mpOn.size, coN = coOn.size, catN = [...cats.values()].filter(h => !h._off).length;
+    const filtered = Object.keys(DEFAULT).some(k => k !== 'others' && f[k] !== DEFAULT[k]);
+    document.getElementById('title').textContent = `5 พรรค · ${mpN}${filtered ? ' จาก ' + mps.size : ''} สส. · ${coN} บริษัท · ${catN} หมวดธุรกิจ`;
+    const msg = document.getElementById('msg'); msg.hidden = coN > 0;
+    if (!coN) msg.textContent = 'ไม่มีข้อมูลที่ตรงกับตัวกรองนี้';
+    state.visible = coN + catN;
+    updateLabels();
+  }
+  function updateLabels() {
+    if (!svg) return;
+    const ratio = state.k / (state.fitK || 1);
+    svg.classed('lbl-mp', true);
+    svg.classed('lbl-all', ratio >= 2.2 || (state.visible || 0) <= 60);
+    scheduleDeclutter();
+  }
+
+  /* ---------- ซ่อนชื่อที่ทับกัน: เลือกแสดงตามลำดับความสำคัญ ---------- */
+  let declutterQueued = false, labelWidth = null;
+  function scheduleDeclutter() {
+    if (declutterQueued) return;
+    declutterQueued = true;
+    requestAnimationFrame(() => { declutterQueued = false; declutter(); });
+  }
+  function measureLabels() {
+    // ความกว้างบนจอคงที่ เพราะขนาดตัวอักษรชดเชยการซูมแล้ว จึงวัดครั้งเดียว
+    labelWidth = new Map();
+    const probe = svg.append('text').attr('x', -9999).attr('y', -9999).style('font-family', 'inherit');
+    nodes.forEach(n => {
+      const t = n.type === 'mp' ? n.name : n.type === 'company' ? shortCo(n.name) : n.name;
+      probe.style('font-size', n.type === 'cat' ? '13.5px' : '10.5px').style('font-weight', n.type === 'cat' ? 700 : 400).text(t);
+      labelWidth.set(n.id, probe.node().getComputedTextLength() + 6);
+    });
+    probe.remove();
+  }
+  function declutter() {
+    if (!svg || !nodeSel) return;
+    if (!labelWidth) measureLabels();
+    const t = d3.zoomTransform(svg.node()), k = t.k, el = svg.node(), W = el.clientWidth, H = el.clientHeight;
+    const lblAll = svg.classed('lbl-all'), lblMp = svg.classed('lbl-mp');
+    const hl = neighbours(state.hover || state.sel);
+    const rank = n => (n.id === state.sel ? 0 : n.type === 'cat' ? 1 : hl && hl.has(n.id) ? 2 : 3);
+    const cand = nodes.filter(n => !n._off && !(hl && !hl.has(n.id)) && (n.id === state.sel || (hl && hl.has(n.id)) || lblAll || (lblMp && n.type === 'cat')))
+      .map(n => {
+        const X = t.applyX(n.x), Y = t.applyY(n.y), Rr = n.r * k, w = labelWidth.get(n.id) || 60, f = n.type === 'cat' ? 13.5 : 10.5;
+        // กรอบตัวอักษรไทยสูงราว 1.1 เท่าเหนือเส้นฐาน และ 0.4 เท่าใต้เส้นฐาน
+        const box = (x0, base, anchor) => { const x1 = anchor === 'middle' ? x0 - w / 2 : anchor === 'end' ? x0 - w : x0; return [x1, base - f * 1.1, x1 + w, base + f * 0.4]; };
+        const bBelow = Rr + f * 1.15 + 2, bAbove = Rr + f * 0.4 + 3, bSide = f * 0.35;
+        const opts = [];
+        // หมวดธุรกิจ: ลองวางชื่อเหนือกลุ่มก่อน
+        if (n.type === 'cat') opts.push({ pos: 'top', base: n.topOff * k - f * 0.4 - 4, box: box(X, Y + n.topOff * k - f * 0.4 - 4, 'middle') });
+        opts.push(
+          { pos: 'below', box: box(X, Y + bBelow, 'middle') },
+          { pos: 'above', box: box(X, Y - bAbove, 'middle') },
+          { pos: 'right', box: box(X + Rr + 3, Y + bSide, 'start') },
+          { pos: 'left', box: box(X - Rr - 3, Y + bSide, 'end') }
+        );
+        return { n, opts, box: opts[0].box };
+      })
+      .filter(c => c.box[2] > 0 && c.box[0] < W && c.box[3] > 0 && c.box[1] < H)
+      .sort((a, b) => rank(a.n) - rank(b.n) || ((b.n.companies || b.n.edges).length - (a.n.companies || a.n.edges).length) || (b.n.r - a.n.r));
+    // กล่องของจุดพรรคและวงกลม สส. ที่มองเห็น ถือเป็นพื้นที่ห้ามทับด้วย
+    const taken = [], cell = 60, grid = new Map();
+    const keys = b => { const out = []; for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) out.push(gx + ',' + gy); return out; };
+    const hit = (b, self) => keys(b).some(key => (grid.get(key) || []).some(o => o.id !== self && b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]));
+    const add = (b, id) => { b.id = id; taken.push(b); keys(b).forEach(key => { if (!grid.has(key)) grid.set(key, []); grid.get(key).push(b); }); };
+    // ปุ่มซูมและกล่องสัญลักษณ์บังแผนผังอยู่ จึงถือเป็นพื้นที่ห้ามวางชื่อ
+    const ob = el.getBoundingClientRect();
+    document.querySelectorAll('.zoom-controls, #legend').forEach(x => { const b = x.getBoundingClientRect(); add([b.left - ob.left - 4, b.top - ob.top - 4, b.right - ob.left + 4, b.bottom - ob.top + 4], 'ui'); });
+    labelSel.each(function (d) { if (!this.classList.contains('off')) { const b = this.getBoundingClientRect(), o = el.getBoundingClientRect(); add([b.left - o.left, b.top - o.top, b.right - o.left, b.bottom - o.top]); } });
+    nodes.forEach(n => { if (!n._off && !(hl && !hl.has(n.id))) { const x = t.applyX(n.x), y = t.applyY(n.y), r = n.r * k + 1; add([x - r, y - r, x + r, y + r], n.id); } }); // ชื่อห้ามทับจุดใด ๆ
+    const show = new Set();
+    const placed = new Map();
+    cand.forEach(c => {
+      const forced = rank(c.n) === 0;
+      const opt = c.opts.find(o => !hit(o.box, c.n.id)) || (forced ? c.opts[0] : null); // จุดที่เลือกแสดงชื่อเสมอ
+      if (opt) { show.add(c.n.id); placed.set(c.n.id, opt.pos); add(opt.box, 'label'); }
+    });
+    nodeSel.classed('lbl-x', d => !show.has(d.id));
+    const ik = 1 / k;
+    nodeSel.filter(d => placed.has(d.id)).select('text').each(function (d) {
+      const pos = placed.get(d.id), el = d3.select(this), f = d.type === 'cat' ? 13.5 : 10.5;
+      if (pos === 'top') el.attr('x', 0).attr('y', d.topOff - (f * 0.4 + 4) * ik).attr('text-anchor', 'middle');
+      else if (pos === 'below') el.attr('x', 0).attr('y', d.r + (f * 1.15 + 2) * ik).attr('text-anchor', 'middle');
+      else if (pos === 'above') el.attr('x', 0).attr('y', -d.r - (f * 0.4 + 3) * ik).attr('text-anchor', 'middle');
+      else if (pos === 'right') el.attr('x', d.r + 3 * ik).attr('y', f * 0.35 * ik).attr('text-anchor', 'start');
+      else el.attr('x', -d.r - 3 * ik).attr('y', f * 0.35 * ik).attr('text-anchor', 'end');
+    });
+  }
+
+  /* ---------- tooltip ---------- */
+  const tip = document.getElementById('tooltip');
+  function showTip(ev, html) { tip.innerHTML = html; tip.style.display = 'block'; moveTip(ev); }
+  function moveTip(ev) {
+    const r = tip.getBoundingClientRect();
+    let x = ev.clientX + 14, y = ev.clientY + 14;
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+    if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+    tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px';
+  }
+  function hideTip() { tip.style.display = 'none'; }
+  function tipFor(d) {
+    if (d.type === 'cat') { const vis = d.companies.filter(c => !c._off); const ms = new Set(vis.flatMap(c => c.mps)); return `<b>${esc(d.name)}</b><br>${vis.length} บริษัท · ${ms.size} สส.<br><span class="muted">${FOCUS_PARTIES.map(p => { const n = vis.filter(c => c.party === p).length; return n ? short(p) + ' ' + n : ''; }).filter(Boolean).join(' · ')}</span>`; }
+    if (d.type === 'mp') return `<b>${esc(d.name)}</b><br><span class="muted">พรรค${esc(d.party)} · ${esc(mpWhere(d))}</span><br>เกี่ยวข้อง ${d.edges.length} บริษัท`;
+    if (d.type === 'company') return `<b>${esc(d.name)}</b><br><span class="muted">${esc(d.cat)} · ${esc(d.status)}</span><br>${d.mps.map(m => esc(m.name) + ' (' + esc(short(m.party)) + ')').join(', ')}${d.lastRev ? `<br>รายได้ปี ${d.lastRev.y}: ${fmtBaht(d.lastRev.rev)} บาท` : ''}${d.govN ? `<br>โครงการภาครัฐ ${d.govN} โครงการ` : ''}`;
+    if (d.type === 'person') return `<b>${esc(d.name)}</b><br><span class="muted">ผู้สมัครปี 2566${d.party66 ? ' พรรค' + esc(d.party66) : ''}</span>`;
+    return `<b>${esc(d.source.name)}</b><br>${esc(roleText(d))}<br>${esc(d.target.name)}`;
+  }
+  const edgeValue = e => e.holdings.length ? d3.max(e.holdings, h => h.value) : null;
+  const mpWhere = m => m.mp.kind === 'list' ? `บัญชีรายชื่อ ลำดับ ${m.mp.rank}` : `${m.mp.prov} เขต ${m.mp.zone}`;
+  const roleText = () => 'เกี่ยวข้องกับ';
+
+  /* ---------- แผงรายละเอียด ---------- */
+  const CLOSE = '<button type="button" class="close-btn" id="side-close" aria-label="กลับไปภาพรวม">✕</button><button type="button" class="back-btn" id="side-back">← กลับไปภาพรวม</button>';
+  const SOURCE = '<div class="source">ข้อมูลจาก business_v6.xlsx (แปลงเป็น business_v6.csv, gov_projects.csv, mp2569_list.csv) และผลเลือกตั้ง election_result-con_69.csv · มูลค่าหุ้นเป็นตัวเลขปี 2566 ตามไฟล์ · ความเกี่ยวข้องกับบริษัทไม่ได้บ่งชี้การกระทำผิด</div>';
+  const link = (id, label) => `<button type="button" class="link-btn" data-sel="${esc(id)}">${esc(label)}</button>`;
+  const statusBadge = c => `<span class="badge ${c.active ? 'b-active' : 'b-closed'}">${esc(c.status || 'ไม่ระบุสถานะ')}</span>`;
+  const roleBadges = () => ''; // ไม่แสดงลักษณะความเกี่ยวข้อง (ถือหุ้น/กรรมการ)
+  const holdingText = () => ''; // ไม่แสดงสัดส่วนและมูลค่าหุ้นรายคน
+  const matchText = m => m.mp.match === 'file' ? 'ระบุเป็น สส. 2569 ในไฟล์' : m.mp.match === 'name_prov' ? 'จับคู่จากชื่อและจังหวัดที่ลงสมัครปี 2566' : `จับคู่จากชื่ออย่างเดียว ${m.prov66 ? 'จังหวัดปี 2566 คือ ' + m.prov66 : 'ไฟล์ไม่มีจังหวัดปี 2566'} ควรตรวจว่าเป็นคนเดียวกัน`;
+
+  function mpCompanyCard(e) {
+    const c = e.target, h = holdingText(e);
+    return `<div class="card" style="border-left-color:${c.active ? '#4A5568' : '#A0AEC0'}">
+      <div class="title">${link(c.id, c.name)}</div>
+      <div>${roleBadges(e)}${statusBadge(c)}<span class="badge b-closed">${link(c.catNode.id, c.cat)}</span>${c.govN ? `<span class="badge b-gov">โครงการรัฐ ${c.govN}</span>` : ''}</div>
+      <div class="meta">${esc(c.cat)}${c.size ? ' · ' + esc(c.size) : ''}</div>
+      ${h ? `<div class="num">${h}</div>` : ''}
+      ${c.lastRev ? `<div class="meta num">รายได้ปี ${c.lastRev.y}: ${fmtBaht(c.lastRev.rev)} บาท</div>` : ''}
+    </div>`;
+  }
+  function sortEdges(list, by) {
+    const val = e => by === 'value' ? d3.max(e.holdings, h => h.value) ?? -Infinity : by === 'revenue' ? (e.target.lastRev ? e.target.lastRev.rev : -Infinity) : by === 'gov' ? e.target.govV : 0;
+    return list.slice().sort((a, b) => by === 'name' ? a.target.name.localeCompare(b.target.name, 'th') : (val(b) - val(a)) || (b.target.active - a.target.active));
+  }
+  function renderMp(m, sortBy) {
+    const es = m.edges, active = es.filter(e => e.target.active).length;
+    const value = d3.sum(es, e => d3.max(e.holdings, h => h.value) || 0);
+    const gov = es.filter(e => e.target.govN).length;
+    return `${CLOSE}<h2><span style="color:${colorOf(m.party)}">●</span> ${esc(m.title === 'นาย' || m.title === 'นาง' || m.title === 'นางสาว' ? m.title : '')}${esc(m.name)}</h2>
+      <div class="sub">พรรค${esc(m.party)} · ${esc(mpWhere(m))}${m.party66 ? `<br>ปี 2566 ลงสมัครพรรค${esc(m.party66)}${m.prov66 ? ' จังหวัด' + esc(m.prov66) : ''}` : ''}${m.exMp62 ? '<br>อดีต สส. หรือ ครม. ชุดปี 2562' : ''}</div>
+      <div><span class="badge ${m.needsCheck ? 'b-check' : 'b-closed'}">${esc(matchText(m))}</span></div>
+      <div class="stats">
+        <div class="stat"><b>${es.length}</b><span>บริษัท</span></div>
+        <div class="stat"><b>${active}</b><span>ยังดำเนินกิจการ</span></div>
+        <div class="stat"><b>${gov}</b><span>มีโครงการรัฐ</span></div>
+      </div>
+      <h3>บริษัทที่เกี่ยวข้อง</h3>
+      <div class="sort-row">เรียงตาม <select id="mp-sort" data-mp="${esc(m.id)}" aria-label="เรียงบริษัท">
+        ${[['revenue', 'รายได้บริษัท'], ['gov', 'มูลค่าโครงการรัฐ'], ['name', 'ชื่อบริษัท']].map(([v, l]) => `<option value="${v}"${v === sortBy ? ' selected' : ''}>${l}</option>`).join('')}
+      </select></div>
+      ${sortEdges(es, sortBy).map(mpCompanyCard).join('')}${SOURCE}`;
+  }
+  function renderCompany(c) {
+    const mpEdges = c.edges.filter(e => e.kind === 'mp'), otherEdges = c.edges.filter(e => e.kind === 'other');
+    const fin = c.fin.length ? `<table class="fin"><thead><tr><th>ปี</th><th>รายได้รวม</th><th>กำไร(ขาดทุน)</th><th>มูลค่าบริษัท</th></tr></thead><tbody>${c.fin.map(f => `<tr><td>${f.y}</td><td>${fmtBaht(f.rev)}</td><td class="${f.profit < 0 ? 'neg' : ''}">${fmtBaht(f.profit)}</td><td>${fmtBaht(f.assets)}</td></tr>`).join('')}</tbody></table><div class="sub" style="margin-top:4px">หน่วย: บาท</div>` : '<div class="sub">ไฟล์ไม่มีข้อมูลงบการเงิน</div>';
+    return `${CLOSE}<h2>${esc(c.name)}</h2>
+      <div class="sub">เลขนิติบุคคล ${esc(c.cid)}${c.altNames.length ? `<br>ชื่ออื่นในไฟล์: ${c.altNames.map(esc).join(', ')}` : ''}</div>
+      <div>${statusBadge(c)}${c.govN ? `<span class="badge b-gov">โครงการรัฐ ${c.govN} สัญญา</span>` : ''}</div>
+      ${c.ticker ? `<div class="sub" style="margin-top:6px">บริษัทจดทะเบียน${c.market ? 'ในตลาด ' + esc(c.market) : ''} ชื่อย่อหุ้น <b>${esc(c.ticker)}</b>${c.price != null ? ` · ราคาปัจจุบันตามไฟล์ ${c.price.toLocaleString('th-TH')} บาทต่อหุ้น` : ''}</div>` : ''}
+      <div class="sub" style="margin-top:6px">หมวด ${link(c.catNode.id, c.cat)}${c.size ? ' · ขนาด ' + esc(c.size) : ''}${c.capital != null ? ` · ทุนจดทะเบียน ${fmtBaht(c.capital)} บาท` : ''}${c.govN ? `<br>มูลค่าโครงการภาครัฐรวม ${fmtBaht(c.govV)} บาท` : ''}</div>
+      <h3>สส. ที่เกี่ยวข้อง</h3>
+      ${mpEdges.map(e => `<div class="card" style="border-left-color:${colorOf(e.source.party)}"><div class="title">${link(e.source.id, e.source.name)}</div><div class="meta">พรรค${esc(e.source.party)} · ${esc(mpWhere(e.source))}</div><div>${roleBadges(e)}${e.source.needsCheck ? '<span class="badge b-check">จับคู่ชื่อต้องตรวจสอบ</span>' : ''}</div>${holdingText(e) ? `<div class="num">${holdingText(e)}</div>` : ''}</div>`).join('')}
+      ${otherEdges.length ? `<h3>ผู้สมัคร สส. ปี 2566 คนอื่นในบริษัทนี้ (${otherEdges.length})</h3>${otherEdges.map(e => `<div class="card" style="border-left-color:#CBD5E0"><div class="title">${esc(e.source.name)}</div><div class="meta">${e.source.party66 ? 'พรรค' + esc(e.source.party66) : 'ไม่ระบุพรรค'}${e.source.prov66 ? ' · ' + esc(e.source.prov66) : ''}</div><div>${roleBadges(e)}</div>${holdingText(e) ? `<div class="num">${holdingText(e)}</div>` : ''}</div>`).join('')}` : ''}
+      ${contractsHtml(c)}
+      <h3>งบการเงิน</h3>${fin}${SOURCE}`;
+  }
+  function contractsHtml(c) {
+    if (!c.govN) return '';
+    if (!c.contracts || !c.contracts.length) return `<h3>โครงการภาครัฐ</h3><div class="sub">${c.govN} โครงการ มูลค่ารวม ${fmtBaht(c.govV)} บาท ตามแท็บหลัก ไม่พบรายละเอียดสัญญาในแท็บโครงการรัฐ</div>`;
+    const years = d3.rollups(c.contracts, v => ({ n: v.length, v: d3.sum(v, x => x.value) }), x => x.year).sort((a, b) => a[0] - b[0]);
+    const direct = d3.sum(c.contracts.filter(x => x.method.includes('เฉพาะเจาะจง')), x => x.value);
+    const top = c.contracts.slice().sort((a, b) => b.value - a.value).slice(0, 8);
+    return `<h3>โครงการภาครัฐ ปีงบ ${years[0][0]}–${years[years.length - 1][0]}</h3>
+      <div class="sub">${c.govN.toLocaleString('th-TH')} สัญญา · มูลค่ารวม ${fmtBaht(c.govV)} บาท · วิธีเฉพาะเจาะจง ${c.govV ? Math.round(direct / c.govV * 100) : 0}% ของมูลค่า</div>
+      <table class="fin"><thead><tr><th>ปีงบ</th><th>สัญญา</th><th>มูลค่า</th></tr></thead><tbody>${years.map(([y, o]) => `<tr><td>${y}</td><td>${o.n}</td><td>${fmtBaht(o.v)}</td></tr>`).join('')}</tbody></table>
+      <div class="sub" style="margin:8px 0 4px">สัญญามูลค่าสูงสุด</div>
+      ${top.map(x => `<div class="card" style="border-left-color:#DD6B20"><div class="num" style="float:right;font-weight:700;margin-left:8px">${fmtBaht(x.value)}</div><div>${esc(x.name)}</div><div class="meta">${esc(x.agency)}${x.sub && x.sub !== x.agency ? ' · ' + esc(x.sub) : ''}<br>ปีงบ ${x.year || '–'} · ${esc(x.method)}${x.prov ? ' · ' + esc(x.prov) : ''}</div></div>`).join('')}`;
+  }
+  function renderCat(h, sortBy) {
+    const vis = h.companies.filter(c => !c._off);
+    const visEdges = vis.flatMap(c => c.edges.filter(e => e.kind === 'mp' && state.eOn.has(e.id)));
+    const ms = new Set(visEdges.map(e => e.source));
+    const val = d3.sum(visEdges.filter(e => e.shareholder), e => edgeValue(e) || 0);
+    const byP = FOCUS_PARTIES.map(p => ({ p, n: vis.filter(c => c.party === p).length, m: [...ms].filter(m => m.party === p).length })).filter(x => x.n);
+    const coVal = c => d3.sum(c.edges.filter(e => e.kind === 'mp' && e.shareholder), e => edgeValue(e) || 0);
+    const rev = c => (c.lastRev && c.lastRev.rev) || 0;
+    const sorter = { mps: (a, b) => b.mps.length - a.mps.length || rev(b) - rev(a), revenue: (a, b) => ((b.lastRev && b.lastRev.rev) || 0) - ((a.lastRev && a.lastRev.rev) || 0), party: (a, b) => FOCUS_PARTIES.indexOf(a.party) - FOCUS_PARTIES.indexOf(b.party) || rev(b) - rev(a) }[sortBy] || ((a, b) => 0);
+    const total = vis.length || 1;
+    return `${CLOSE}<h2>${esc(h.name)}</h2>
+      <div class="sub">หมวดธุรกิจ${Object.keys(DEFAULT).some(k => k !== 'others' && state.f[k] !== DEFAULT[k]) ? ' · นับตามตัวกรองที่เลือก' : ''}</div>
+      <div class="stats">
+        <div class="stat"><b>${vis.length}</b><span>บริษัท</span></div>
+        <div class="stat"><b>${ms.size}</b><span>สส.</span></div>
+        <div class="stat"><b>${fmtBaht(val)}</b><span>มูลค่าหุ้น 2566 (บาท)</span></div>
+      </div>
+      <div class="meter" aria-hidden="true">${byP.map(x => `<span style="width:${x.n / total * 100}%;background:${colorOf(x.p)}"></span>`).join('')}</div>
+      <div class="chart-legend">${byP.map(x => `<span><i style="background:${colorOf(x.p)};height:9px;width:9px"></i>${esc(x.p)} ${x.n} บริษัท · ${x.m} สส.</span>`).join('')}</div>
+      <button type="button" class="reset-btn" data-cat="${esc(h.name)}" style="margin:8px 0 4px">${state.f.cat === h.name ? 'ยกเลิกการกรองหมวดนี้' : 'กรองแผนผังเฉพาะหมวดนี้'}</button>
+      <h3>บริษัทในหมวดนี้ (${vis.length})</h3>
+      <div class="sort-row">เรียงตาม <select id="cat-sort" data-cat="${esc(h.id)}" aria-label="เรียงบริษัท">
+        ${[['mps', 'จำนวน สส.'], ['revenue', 'รายได้บริษัท'], ['party', 'พรรค']].map(([v, l]) => `<option value="${v}"${v === sortBy ? ' selected' : ''}>${l}</option>`).join('')}
+      </select></div>
+      ${vis.slice().sort(sorter).map(c => {
+        return `<div class="card" style="border-left-color:${colorOf(c.party)}">
+          <div class="title">${link(c.id, c.name)}</div>
+          <div>${statusBadge(c)}${c.govN ? `<span class="badge b-gov">โครงการรัฐ ${c.govN}</span>` : ''}${c.ticker ? `<span class="badge b-sh">${esc(c.ticker)}</span>` : ''}</div>
+          <div class="meta">${c.mps.map(m => `${link(m.id, m.name)} <span style="color:${colorOf(m.party)}">●</span> ${esc(short(m.party))}`).join(', ')}</div>
+          ${c.lastRev ? `<div class="meta num">รายได้ปี ${c.lastRev.y}: ${fmtBaht(c.lastRev.rev)} บาท</div>` : ''}
+        </div>`;
+      }).join('')}${SOURCE}`;
+  }
+  function renderPerson(p) {
+    return `${CLOSE}<h2>${esc(p.name)}</h2><div class="sub">ผู้สมัคร สส. ปี 2566${p.party66 ? ' พรรค' + esc(p.party66) : ''}${p.prov66 ? ' จังหวัด' + esc(p.prov66) : ''}<br>ไม่ได้เป็น สส. ปี 2569 ตามข้อมูลที่ใช้</div>
+      <h3>บริษัทที่เกี่ยวข้องกับ สส. ในแผนผัง</h3>${p.edges.map(e => `<div class="card"><div class="title">${link(e.target.id, e.target.name)}</div><div>${roleBadges(e)}${statusBadge(e.target)}</div>${holdingText(e) ? `<div class="num">${holdingText(e)}</div>` : ''}</div>`).join('')}${SOURCE}`;
+  }
+  function renderEdge(e) {
+    return `${CLOSE}<h2>${esc(e.source.name)}</h2><div class="sub">${esc(roleText(e))}ใน ${link(e.target.id, e.target.name)}</div>
+      ${e.kind === 'mp' ? mpCompanyCard(e) : `<div class="card"><div>${roleBadges(e)}</div>${holdingText(e) ? `<div class="num">${holdingText(e)}</div>` : ''}</div>`}
+      <div class="sub">${e.kind === 'mp' ? link(e.source.id, 'ดูบริษัททั้งหมดของ ' + e.source.name) : ''}</div>${SOURCE}`;
+  }
+
+  /* ---------- แถบสรุปภาพรวม ---------- */
+  state.metric = 'people';
+  state.tab = 'overview';
+  const METRICS = { people: 'จำนวน สส.', value: 'มูลค่าหุ้น', companies: 'จำนวนบริษัท' };
+  const pColor = p => colorOf(p);
+  function summaryData() {
+    const vis = edges.filter(e => e.kind === 'mp' && state.eOn && state.eOn.has(e.id));
+    const by = {};
+    FOCUS_PARTIES.forEach(p => {
+      const es = vis.filter(e => e.source.party === p);
+      const people = new Set(es.map(e => e.source)), cos = new Set(es.map(e => e.target));
+      const sh = es.filter(e => e.shareholder);
+      const valByPerson = d3.rollups(sh, v => d3.sum(v, e => edgeValue(e) || 0), e => e.source).sort((a, b) => b[1] - a[1]);
+      const totalVal = d3.sum(valByPerson, d => d[1]);
+      const govCos = [...cos].filter(c => c.govN > 0);
+      by[p] = { es, people, cos, sh, shPeople: new Set(sh.map(e => e.source)), totalVal, valByPerson,
+        active: [...cos].filter(c => c.active).length, govCos, govVal: d3.sum(govCos, c => c.govV),
+        list: [...people].filter(m => m.mp.kind === 'list').length, zone: [...people].filter(m => m.mp.kind === 'zone').length };
+    });
+    return { vis, by };
+  }
+  function industryRows(vis) {
+    const cats = [...new Set(vis.map(e => e.target.cat))];
+    const val = (es, m) => m === 'people' ? new Set(es.map(e => e.source)).size : m === 'companies' ? new Set(es.map(e => e.target)).size
+      : d3.sum(es.filter(e => e.shareholder), e => edgeValue(e) || 0);
+    return cats.map(cat => {
+      const row = { cat, v: {} };
+      FOCUS_PARTIES.forEach(p => { row.v[p] = val(vis.filter(e => e.target.cat === cat && e.source.party === p), state.metric); });
+      row.total = d3.sum(FOCUS_PARTIES, p => row.v[p]);
+      return row;
+    }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
+  }
+  const fmtMetric = v => state.metric === 'value' ? fmtBaht(v) : v.toLocaleString('th-TH');
+  function renderSummary() {
+    if (state.tab === 'perf') return renderPerf();
+    const { vis, by } = summaryData();
+    const filtered = Object.keys(DEFAULT).some(k => k !== 'others' && state.f[k] !== DEFAULT[k]);
+    const head = FOCUS_PARTIES.map(p => `<th title="${esc(p)}"><span class="dot" style="background:${pColor(p)}"></span>${esc(short(p))}</th>`).join('');
+    const row = (label, fn) => `<tr><td>${label}</td>${FOCUS_PARTIES.map(p => `<td>${fn(by[p], p)}</td>`).join('')}</tr>`;
+    const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+    const insights = ''; // ไม่ระบุมูลค่าหุ้นรายคน
+    const ind = industryRows(vis), top = ind.slice(0, 10), max = d3.max(top, r => d3.sum(FOCUS_PARTIES, p => Math.max(0, r.v[p]))) || 1;
+    const leader = p => { const r = ind.slice().sort((a, b) => b.v[p] - a.v[p])[0]; return r && r.v[p] ? r : null; };
+    const leadText = FOCUS_PARTIES.map(p => { const r = leader(p); return r ? `<span class="dot" style="background:${pColor(p)}"></span>${esc(p)}: <b>${esc(r.cat)}</b> (${fmtMetric(r.v[p])}${state.metric === 'value' ? ' บาท' : ''})` : ''; }).filter(Boolean).join('<br>');
+    const bars = top.map(r => `<button type="button" class="ind${state.f.cat === r.cat ? ' on' : ''}" data-cat="${esc(r.cat)}" aria-pressed="${state.f.cat === r.cat}" title="คลิกเพื่อกรองแผนผังตามหมวดนี้">
+        <div class="lab"><span>${esc(r.cat)}</span></div>
+        <div class="bar-row"><div class="stack" style="width:${Math.max(0.5, d3.sum(FOCUS_PARTIES, p => Math.max(0, r.v[p])) / max * 78)}%">${FOCUS_PARTIES.filter(p => r.v[p] > 0).map(p => `<span style="flex:${r.v[p]} 1 0;background:${pColor(p)}" title="${esc(p)} ${fmtMetric(r.v[p])}"></span>`).join('')}</div><span class="bar-val">${fmtMetric(r.total)}</span></div>
+      </button>`).join('');
+    const mostCos = FOCUS_PARTIES.map(p => d3.rollups(by[p].es, v => v.length, e => e.source).sort((a, b) => b[1] - a[1]).slice(0, 3)).flat().sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const gov = [...new Set(vis.map(e => e.target))].filter(c => c.govN > 0).sort((a, b) => b.govV - a.govV).slice(0, 8);
+    const mpNames = c => c.edges.filter(e => e.kind === 'mp' && FOCUS_PARTIES.includes(e.source.party)).map(e => `${link(e.source.id, e.source.name)} (${esc(short(e.source.party))})`).join(', ');
+    return `${TABS()}<h2>ภาพรวมธุรกิจ สส. 5 พรรค</h2>
+      <div class="sub">${filtered ? 'คำนวณตามตัวกรองที่เลือกอยู่' : 'สส. ปี 2569 ที่พบในไฟล์ business_v6.csv'} · คลิกจุดในแผนผังเพื่อดูรายละเอียด</div>
+      <table class="cmp"><thead><tr><th></th>${head}</tr></thead><tbody>
+        ${filtered ? '' : `<tr><td>สส. ทั้งพรรค</td>${FOCUS_PARTIES.map(p => { const st = state.seats[p]; return `<td>${st.zone + st.list}</td>`; }).join('')}</tr>`}
+        ${row('สส. ที่พบบริษัท', b => b.people.size)}
+        ${row('· บัญชีรายชื่อ', (b, p) => filtered ? `${b.list}` : `${b.list}/${state.seats[p].list}`)}
+        ${row('· เขต', (b, p) => filtered ? `${b.zone}` : `${b.zone}/${state.seats[p].zone}`)}
+        ${row('บริษัท', b => b.cos.size)}
+        ${row('ยังดำเนินกิจการ', b => pct(b.active, b.cos.size))}
+        ${row('มูลค่าหุ้น 2566', b => fmtS(b.totalVal))}
+        ${row('บ. มีโครงการรัฐ', b => b.govCos.length)}
+        ${row('มูลค่าโครงการรัฐ 62–65', b => fmtS(b.govVal))}
+      </tbody></table>
+      <div class="sub" style="margin-top:4px">ล. = ล้านบาท · "12/19" คือพบ 12 จาก สส. ทั้งหมด 19 คน · นับเฉพาะ สส. ที่พบบริษัทในไฟล์ จึงไม่ใช่ทั้งพรรค · ไฟล์มีเฉพาะผู้ที่ลงสมัครปี 2566</div>
+      ${insights ? `<h3>มูลค่าหุ้นกระจุกตัว</h3>${insights}` : ''}
+      <h3>หมวดธุรกิจที่เกี่ยวข้องมากที่สุด</h3>
+      <div class="seg" role="group" aria-label="เลือกตัววัด">${Object.entries(METRICS).map(([k, l]) => `<button type="button" data-metric="${k}" class="${state.metric === k ? 'on' : ''}" aria-pressed="${state.metric === k}">${l}</button>`).join('')}</div>
+      ${leadText ? `<div class="insight">อันดับ 1 ของแต่ละพรรค ตาม${METRICS[state.metric]}<br>${leadText}</div>` : ''}
+      <div class="chart-legend" style="margin-bottom:4px">${FOCUS_PARTIES.map(p => `<span><i style="background:${pColor(p)};height:9px;width:9px"></i>${esc(p)}</span>`).join('')}</div>
+      ${bars || '<div class="sub">ไม่มีข้อมูล</div>'}
+      <div class="sub">${state.metric === 'value' ? 'มูลค่าหุ้นรวมของ สส. ในหมวด ไม่แยกรายคน' : state.metric === 'people' ? 'นับ สส. ไม่ซ้ำในแต่ละหมวด หนึ่งคนอาจอยู่หลายหมวด' : 'นับบริษัทไม่ซ้ำ'} · คลิกหมวดเพื่อกรองแผนผัง${state.f.cat !== 'all' ? ' คลิกซ้ำเพื่อยกเลิก' : ''}</div>
+      <h3>สส. ที่เกี่ยวข้องกับบริษัทมากที่สุด</h3>
+      <ol class="rank-list">${mostCos.map(([m, n]) => `<li style="border-left-color:${pColor(m.party)}"><span class="v">${n} บริษัท</span>${link(m.id, m.name)}<br><span style="color:#5b6472;font-size:12px">${esc(mpWhere(m))}</span></li>`).join('') || '<li>ไม่มีข้อมูล</li>'}</ol>
+      <h3>บริษัทที่มีโครงการภาครัฐ</h3>
+      <div class="caveat">สัญญาปีงบ 2562–2565 ซึ่งเป็นช่วงก่อน สส. ชุดนี้ดำรงตำแหน่ง และไม่ได้แปลว่า สส. มีส่วนในการได้งาน</div>
+      <ol class="rank-list">${gov.map(c => `<li><span class="v">${fmtBaht(c.govV)}</span>${link(c.id, c.name)}<br><span style="font-size:12px;color:#5b6472">${c.govN} สัญญา · ${mpNames(c)}</span></li>`).join('') || '<li>ไม่มีข้อมูล</li>'}</ol>
+      ${SOURCE}`;
+  }
+
+  /* ---------- แท็บติดตามผลประกอบการ ---------- */
+  const TABS = () => `<div class="tabs" role="tablist">${[['overview', 'ภาพรวม'], ['perf', 'ติดตามผลประกอบการ']].map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" class="${state.tab === k ? 'on' : ''}" aria-selected="${state.tab === k}">${l}</button>`).join('')}</div>`;
+  const BASE_COLOR = '#A0AEC0', BASE_LABEL = 'บริษัทผู้สมัครอื่น';
+  const revOf = (c, y) => { const f = c.fin.find(x => x.y === y); return f ? f.rev : null; };
+  const cagr = (a, b, years) => (a > 0 && b > 0) ? Math.pow(b / a, 1 / years) - 1 : null;
+  const fmtG = g => g == null ? '–' : `<span class="${g > 0.0005 ? 'pos' : g < -0.0005 ? 'negv' : ''}">${g > 0 ? '+' : ''}${(g * 100).toLocaleString('th-TH', { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%</span>`;
+  const growthStats = list => {
+    const ok = list.filter(x => x.g != null);
+    return { n: ok.length, med: ok.length ? d3.median(ok, x => x.g) : null, prof: ok.length ? ok.filter(x => x.p > 0).length / ok.length : null };
+  };
+  function perfData() {
+    const vis = edges.filter(e => e.kind === 'mp' && state.eOn && state.eOn.has(e.id));
+    const cos = {}; FOCUS_PARTIES.forEach(p => { cos[p] = [...new Set(vis.filter(e => e.source.party === p).map(e => e.target))]; });
+    const allCos = [...new Set(vis.map(e => e.target))];
+    const mpRow = c => ({ c, cat: c.cat, g: cagr(revOf(c, 2562), revOf(c, 2567), 5), p: (c.fin.find(x => x.y === 2567) || {}).profit, rev: y => revOf(c, y) });
+    const catFilter = state.f.cat;
+    const base = baseline.filter(b => catFilter === 'all' || b.cat === catFilter)
+      .map(b => ({ cat: b.cat, g: cagr(b.rev[2562], b.rev[2567], 5), p: b.p2567, rev: y => b.rev[y] }));
+    return { vis, cos, allCos, mpRows: Object.fromEntries(FOCUS_PARTIES.map(p => [p, cos[p].map(mpRow)])), allRows: allCos.map(mpRow), base };
+  }
+  function indexSeries(rows) {
+    const yrs = [2562, 2563, 2564, 2565, 2566, 2567];
+    const sample = rows.filter(r => yrs.every(y => r.rev(y) > 0));
+    return { n: sample.length, pts: yrs.map(y => ({ y, v: sample.length ? d3.median(sample, r => r.rev(y) / r.rev(2562) * 100) : null })) };
+  }
+  function lineChart(series) {
+    const W = 330, H = 190, m = { l: 34, r: 76, t: 12, b: 24 };
+    const all = series.flatMap(s => s.pts.map(p => p.v)).filter(v => v != null);
+    if (!all.length) return '<div class="sub">ข้อมูลไม่พอสำหรับกราฟ</div>';
+    const x = d3.scaleLinear().domain([2562, 2567]).range([m.l, W - m.r]);
+    const y = d3.scaleLinear().domain([Math.min(80, d3.min(all)), Math.max(120, d3.max(all))]).nice(4).range([H - m.b, m.t]);
+    const line = d3.line().defined(p => p.v != null).x(p => x(p.y)).y(p => y(p.v));
+    const ticks = y.ticks(4);
+    const grid = ticks.map(t => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="${t === 100 ? '#A0AEC0' : '#EDE8DC'}" stroke-width="1"${t === 100 ? ' stroke-dasharray="3 3"' : ''}/><text x="${m.l - 5}" y="${y(t) + 3.5}" font-size="10" text-anchor="end" fill="#718096">${t}</text>`).join('');
+    const xt = [2562, 2563, 2564, 2565, 2566, 2567].map(t => `<text x="${x(t)}" y="${H - 7}" font-size="10" text-anchor="middle" fill="#718096">${t}</text>`).join('');
+    // ป้ายปลายเส้น เลี่ยงการทับกัน
+    const ends = series.map(s => { const last = s.pts[s.pts.length - 1]; return { s, v: last.v, yy: last.v == null ? null : y(last.v) }; }).filter(e => e.v != null).sort((a, b) => a.yy - b.yy);
+    for (let i = 1; i < ends.length; i++) if (ends[i].yy - ends[i - 1].yy < 12) ends[i].yy = ends[i - 1].yy + 12;
+    const paths = series.map(s => `<path d="${line(s.pts)}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` +
+      s.pts.filter(p => p.v != null).map(p => `<circle class="pt" cx="${x(p.y)}" cy="${y(p.v)}" r="3" fill="${s.color}" stroke="#fff" stroke-width="1.5"><title>${esc(s.name)} ปี ${p.y}: ${p.v.toFixed(0)}</title></circle><circle cx="${x(p.y)}" cy="${y(p.v)}" r="9" fill="transparent"><title>${esc(s.name)} ปี ${p.y}: ${p.v.toFixed(0)}</title></circle>`).join('')).join('');
+    const labels = ends.map(e => `<text x="${W - m.r + 6}" y="${e.yy + 3.5}" font-size="10.5" fill="#2D3748">${esc(e.s.short)} ${e.v.toFixed(0)}</text>`).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="ดัชนีรายได้ค่ามัธยฐาน ปี 2562 เท่ากับ 100">${grid}${xt}${paths}${labels}</svg>`;
+  }
+  function renderPerf() {
+    const d = perfData();
+    const stats = FOCUS_PARTIES.map(p => ({ p, ...growthStats(d.mpRows[p]) }));
+    const baseStats = growthStats(d.base);
+    const smallN = n => n < 20 ? '<span class="small-n">ข้อมูลน้อย</span>' : '';
+    const listed = d.allCos.filter(c => c.ticker);
+    const sizes = ['Micro', 'Small', 'Medium', 'Large'], sizeColor = { Micro: '#CBD5E0', Small: '#A0AEC0', Medium: '#718096', Large: '#2D3748' };
+    const sizeCount = Object.fromEntries(sizes.map(z => [z, d.allCos.filter(c => c.size === z).length]));
+    const total = d.allCos.length || 1;
+    // ตารางรายอุตสาหกรรม (รวม 5 พรรค)
+    const cats = d3.rollups(d.allRows.filter(r => r.g != null), v => v, r => r.cat).sort((a, b) => b[1].length - a[1].length).slice(0, 8);
+    const catRows = cats.map(([cat, rows]) => {
+      const b = growthStats(baseline.filter(x => x.cat === cat).map(x => ({ g: cagr(x.rev[2562], x.rev[2567], 5), p: x.p2567 })));
+      const mg = d3.median(rows, r => r.g);
+      return `<tr><td><button type="button" class="link-btn" data-cat="${esc(cat)}" style="color:#1e293b">${esc(cat)}</button></td><td>${fmtG(mg)}<br><span style="font-size:10.5px;color:#718096">${rows.length} บริษัท</span>${smallN(rows.length)}</td><td>${fmtG(b.med)}<br><span style="font-size:10.5px;color:#718096">${b.n} บริษัท</span></td></tr>`;
+    }).join('');
+    const series = [
+      ...FOCUS_PARTIES.map(p => { const s = indexSeries(d.mpRows[p]); return { name: p, short: short(p), color: colorOf(p), ...s }; }),
+      (() => { const s = indexSeries(d.base); return { name: BASE_LABEL, short: 'อื่น', color: BASE_COLOR, ...s }; })()
+    ];
+    const with2568 = d.allCos.filter(c => revOf(c, 2568) > 0).length;
+    const latestYears = d3.rollups(d.allCos.filter(c => c.latest), v => v.length, c => c.latest).sort((a, b) => b[0] - a[0]);
+    // โครงการรัฐ: ใช้ช่วงปีเดียวกันกับรายได้ (ปีงบ 2562–2565)
+    const GY = [2562, 2563, 2564, 2565];
+    const depRev = c => d3.sum(c.fin.filter(f => GY.includes(f.y)), f => f.rev > 0 ? f.rev : 0);
+    const dep = d.allCos.filter(c => c.govV > 0 && !c.govFallback).map(c => ({ c, rev: depRev(c) })).filter(x => x.rev > 0)
+      .map(x => ({ ...x, ratio: x.c.govV / x.rev })).sort((a, b) => b.ratio - a.ratio).slice(0, 6);
+    const govParty = FOCUS_PARTIES.map(p => {
+      const cs = d.cos[p].filter(c => c.contracts && c.contracts.length), all = cs.flatMap(c => c.contracts);
+      const total = d3.sum(all, x => x.value), direct = d3.sum(all.filter(x => x.method.includes('เฉพาะเจาะจง')), x => x.value);
+      return { p, cs, all, total, direct, byYear: GY.map(y => d3.sum(all.filter(x => x.year === y), x => x.value)) };
+    });
+    const govMax = d3.max(GY.map((y, i) => d3.sum(govParty, g => g.byYear[i]))) || 1;
+    const agencies = d3.rollups(govParty.flatMap(g => g.all), v => ({ n: v.length, v: d3.sum(v, x => x.value) }), x => x.agency).sort((a, b) => b[1].v - a[1].v).slice(0, 5);
+    const mpNames = c => c.edges.filter(e => e.kind === 'mp' && FOCUS_PARTIES.includes(e.source.party)).map(e => `${link(e.source.id, e.source.name)} (${esc(short(e.source.party))})`).join(', ');
+    const filtered = Object.keys(DEFAULT).some(k => k !== 'others' && state.f[k] !== DEFAULT[k]);
+    return `${TABS()}<h2>ติดตามผลประกอบการ</h2>
+      <div class="disclaimer"><b>ไม่ใช่คำแนะนำการลงทุน</b> ส่วนนี้แสดงผลประกอบการในอดีตจากไฟล์ ไม่ได้บอกว่าตำแหน่ง สส. ทำให้ธุรกิจเติบโต และไม่ได้แนะนำให้ซื้อหุ้นใด</div>
+      <div class="sub">${filtered ? 'คำนวณตามตัวกรองที่เลือกอยู่' : 'บริษัทที่ สส. 5 พรรคเกี่ยวข้อง'} เทียบกับบริษัทของผู้สมัครปี 2566 คนอื่นที่ไม่ได้เป็น สส. ปี 2569${state.f.cat !== 'all' ? ` ในหมวด${esc(state.f.cat)}` : ''}</div>
+
+      <h3>1. ลงทุนตามได้จริงไหม</h3>
+      <div class="insight">บริษัทจดทะเบียนในตลาดหลักทรัพย์ <b>${listed.length}</b> จาก ${d.allCos.length} บริษัท${listed.length ? ` (${listed.map(c => link(c.id, c.ticker)).join(', ')})` : ''}<br>บริษัทส่วนใหญ่ไม่ได้อยู่ในตลาด คนทั่วไปจึงซื้อหุ้นโดยตรงไม่ได้</div>
+      <div class="meter" aria-hidden="true">${sizes.map(z => sizeCount[z] ? `<span style="width:${sizeCount[z] / total * 100}%;background:${sizeColor[z]}" title="${z} ${sizeCount[z]}"></span>` : '').join('')}</div>
+      <div class="chart-legend">${sizes.map(z => `<span><i style="background:${sizeColor[z]};height:9px;width:9px"></i>${z} ${sizeCount[z]} (${Math.round(sizeCount[z] / total * 100)}%)</span>`).join('')}</div>
+
+      <h3>2. เติบโตกว่าบริษัทอื่นไหม</h3>
+      <table class="cmp"><thead><tr><th></th>${FOCUS_PARTIES.map(p => `<th title="${esc(p)}"><span class="dot" style="background:${colorOf(p)}"></span>${esc(short(p))}</th>`).join('')}<th><span class="dot" style="background:${BASE_COLOR}"></span>อื่น</th></tr></thead><tbody>
+        <tr><td>บริษัทที่ใช้เทียบ</td>${stats.map(s => `<td>${s.n}${smallN(s.n)}</td>`).join('')}<td>${baseStats.n.toLocaleString('th-TH')}</td></tr>
+        <tr><td>รายได้โต/ปี 62–67</td>${stats.map(s => `<td>${fmtG(s.med)}</td>`).join('')}<td>${fmtG(baseStats.med)}</td></tr>
+        <tr><td>มีกำไรปี 2567</td>${stats.map(s => `<td>${s.prof == null ? '–' : Math.round(s.prof * 100) + '%'}</td>`).join('')}<td>${baseStats.prof == null ? '–' : Math.round(baseStats.prof * 100) + '%'}</td></tr>
+      </tbody></table>
+      <div class="sub" style="margin-top:4px">อัตราเติบโตเป็นค่ามัธยฐานแบบทบต้น นับเฉพาะบริษัทที่มีรายได้ทั้งปี 2562 และ 2567</div>
+
+      <h3>3. ดัชนีรายได้ (ปี 2562 = 100)</h3>
+      <div class="chart-wrap">${lineChart(series)}
+        <div class="chart-legend">${series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)} (${s.n.toLocaleString('th-TH')} บริษัท)</span>`).join('')}</div>
+      </div>
+      <div class="sub" style="margin-top:4px">ค่ามัธยฐานของรายได้แต่ละปีเทียบกับปี 2562 ใช้เฉพาะบริษัทที่มีรายได้ครบทุกปี 2562–2567 · สส. ชุดนี้เข้ารับตำแหน่งปี 2569 กราฟจึงยังเป็นช่วงก่อนดำรงตำแหน่งทั้งหมด</div>
+
+      <h3>4. แยกตามอุตสาหกรรม</h3>
+      <table class="cmp"><thead><tr><th>หมวด</th><th>บริษัท สส.</th><th>บริษัทอื่น</th></tr></thead><tbody>${catRows || '<tr><td colspan="3">ไม่มีข้อมูล</td></tr>'}</tbody></table>
+      <div class="sub" style="margin-top:4px">รายได้โตต่อปี 2562–2567 (ค่ามัธยฐาน) · "ข้อมูลน้อย" คือมีไม่ถึง 20 บริษัท ตัวเลขอาจเปลี่ยนมากจากบริษัทไม่กี่แห่ง · คลิกชื่อหมวดเพื่อกรอง</div>
+
+      <h3>5. ความพร้อมของข้อมูลหลังเข้ารับตำแหน่ง</h3>
+      <div class="insight">มีงบปี 2568 แล้ว <b>${with2568}</b> จาก ${d.allCos.length} บริษัท ยังไม่มีงบปี 2569 ซึ่งเป็นปีแรกที่ดำรงตำแหน่ง จึงยังวัดผลหลังเข้ารับตำแหน่งไม่ได้</div>
+      ${latestYears.length ? `<div class="sub">ปีงบล่าสุดในไฟล์: ${latestYears.map(([y, n]) => `${y} (${n})`).join(' · ')}</div>` : ''}
+
+      <h3>6. โครงการภาครัฐ ปีงบ 2562–2565</h3>
+      ${state.govDetail ? `<div class="caveat">สัญญาทั้งหมดอยู่ในช่วงก่อน สส. ชุดนี้ดำรงตำแหน่ง และไม่ได้แปลว่า สส. มีส่วนในการได้งาน</div>
+      <table class="cmp"><thead><tr><th></th>${FOCUS_PARTIES.map(p => `<th title="${esc(p)}"><span class="dot" style="background:${colorOf(p)}"></span>${esc(short(p))}</th>`).join('')}</tr></thead><tbody>
+        <tr><td>บริษัทที่ได้สัญญา</td>${govParty.map(g => `<td>${g.cs.length}</td>`).join('')}</tr>
+        <tr><td>จำนวนสัญญา</td>${govParty.map(g => `<td>${g.all.length.toLocaleString('th-TH')}</td>`).join('')}</tr>
+        <tr><td>มูลค่ารวม</td>${govParty.map(g => `<td>${fmtS(g.total)}</td>`).join('')}</tr>
+        <tr><td>เฉพาะเจาะจง (% มูลค่า)</td>${govParty.map(g => `<td>${g.total ? Math.round(g.direct / g.total * 100) + '%' : '–'}</td>`).join('')}</tr>
+      </tbody></table>
+      <div class="sub" style="margin:8px 0 4px">มูลค่าสัญญารายปีงบ</div>
+      ${GY.map((y, i) => { const tot = d3.sum(govParty, g => g.byYear[i]); return `<div class="ind" style="cursor:default"><div class="lab"><span>${y}</span></div><div class="bar-row"><div class="stack" style="width:${Math.max(0.5, tot / govMax * 78)}%">${govParty.filter(g => g.byYear[i] > 0).map(g => `<span style="flex:${g.byYear[i]} 1 0;background:${colorOf(g.p)}" title="${esc(g.p)} ${fmtBaht(g.byYear[i])}"></span>`).join('')}</div><span class="bar-val">${fmtBaht(tot)}</span></div></div>`; }).join('')}
+      <div class="chart-legend">${FOCUS_PARTIES.map(p => `<span><i style="background:${colorOf(p)};height:9px;width:9px"></i>${esc(p)}</span>`).join('')}</div>
+      ${agencies.length ? `<div class="sub" style="margin:8px 0 4px">หน่วยงานที่ทำสัญญามูลค่าสูงสุด (รวม 5 พรรค)</div><ol class="rank-list">${agencies.map(([a, o]) => `<li><span class="v">${fmtBaht(o.v)}</span>${esc(a)}<br><span style="font-size:12px;color:#5b6472">${o.n.toLocaleString('th-TH')} สัญญา</span></li>`).join('')}</ol>` : ''}` : '<div class="sub">ไม่ได้โหลดไฟล์ gov_projects.csv จึงไม่มีรายละเอียดสัญญา</div>'}
+      <h3>7. มูลค่าสัญญาเทียบกับรายได้ช่วงเดียวกัน</h3>
+      <div class="caveat">เทียบมูลค่าสัญญาปีงบ 2562–2565 กับรายได้รวมปี 2562–2565 ปีงบประมาณกับปีบัญชีไม่ตรงกันพอดี และสัญญาอาจรับรู้รายได้หลายปี ใช้ชี้บริษัทที่ควรตรวจต่อเท่านั้น</div>
+      <ol class="rank-list">${dep.map(x => `<li><span class="v">${x.ratio >= 10 ? '>1,000%' : Math.round(x.ratio * 100).toLocaleString('th-TH') + '%'}</span>${link(x.c.id, x.c.name)}<br><span style="font-size:12px;color:#5b6472">สัญญา ${fmtBaht(x.c.govV)} · รายได้ 2562–2565 ${fmtBaht(x.rev)} · ${mpNames(x.c)}</span></li>`).join('') || '<li>ไม่มีข้อมูล</li>'}</ol>
+      ${SOURCE}`;
+  }
+  function showSummary() {
+    const side = document.getElementById('sidebar');
+    const top = side.scrollTop;
+    side.innerHTML = renderSummary(); side.classList.add('open', 'summary');
+    side.scrollTop = state.keepSummaryScroll ? top : 0; state.keepSummaryScroll = false;
+  }
+  function find(id) {
+    if (id.startsWith('mp:')) return mps.get(id.slice(3));
+    if (id.startsWith('co:')) return companies.get(id.slice(3));
+    if (id.startsWith('pe:')) return others.get(id.slice(3));
+    if (id.startsWith('cat:')) return cats.get(id.slice(4));
+    return edges.find(e => e.id === id);
+  }
+  function select(id, opts = {}) {
+    state.sel = id; hideTip();
+    const side = document.getElementById('sidebar');
+    if (!id) { apply(); showSummary(); return; }
+    side.classList.remove('summary');
+    const d = find(id); if (!d) return;
+    side.innerHTML = d.type === 'cat' ? renderCat(d, opts.sort || 'mps') : d.type === 'mp' ? renderMp(d, opts.sort || 'revenue') : d.type === 'company' ? renderCompany(d) : d.type === 'person' ? renderPerson(d) : renderEdge(d);
+    side.classList.add('open'); if (!opts.keepScroll) side.scrollTop = 0;
+    apply();
+    if (innerWidth <= 1000) { const box = svg.node().getBoundingClientRect(); if (box.top < 0 || box.top > innerHeight * .3) svg.node().scrollIntoView({ block: 'start' }); }
+    if (opts.focus || innerWidth <= 1000) {
+      const near = (d.type === 'cat' ? [d, ...d.companies.filter(c => !c._off)] : d.type === 'company' ? [d, d.catNode] : d.edges ? d.edges.map(e => e.target) : []).filter(n => n.x != null);
+      if (near.length) requestAnimationFrame(() => focusOn(near));
+    }
+  }
+
+  /* ---------- ค้นหา ---------- */
+  function searchAll(q) {
+    const s = q.trim(); if (!s) return [];
+    const out = [];
+    cats.forEach(h => { if (h.name.includes(s)) out.push({ label: h.name, sub: `หมวดธุรกิจ · ${h.companies.length} บริษัท`, id: h.id }); });
+    mps.forEach(m => { if (m.name.includes(s)) out.push({ label: m.name, sub: `สส. พรรค${m.party} · ${mpWhere(m)} · ${m.edges.length} บริษัท`, id: m.id }); });
+    companies.forEach(c => { if (c.name.includes(s) || c.cid.includes(s) || c.altNames.some(n => n.includes(s))) out.push({ label: c.name, sub: `บริษัท · ${c.cid} · ${c.status}`, id: c.id }); });
+    others.forEach(p => { if (p.name.includes(s)) out.push({ label: p.name, sub: 'ผู้สมัครปี 2566 คนอื่น', id: p.id }); });
+    return out.slice(0, 15);
+  }
+  function wireSearch() {
+    const input = document.getElementById('search'), box = document.getElementById('search-results');
+    let items = [], cur = -1;
+    const close = () => { box.hidden = true; cur = -1; };
+    const paint = () => { box.innerHTML = items.length ? items.map((it, i) => `<button type="button" class="search-item${i === cur ? ' cursor' : ''}" data-i="${i}">${esc(it.label)}<small>${esc(it.sub)}</small></button>`).join('') : '<div class="search-empty">ไม่พบในแผนผังนี้</div>'; box.hidden = false; };
+    const run = i => { const it = items[i]; if (!it) return; const d = find(it.id); if (d && d._off) { state.f = { ...DEFAULT }; renderFilters(); } select(it.id, { focus: true }); input.value = ''; close(); };
+    input.addEventListener('input', () => { items = searchAll(input.value); cur = -1; input.value.trim() ? paint() : close(); });
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowDown' && items.length) { cur = (cur + 1) % items.length; paint(); ev.preventDefault(); }
+      else if (ev.key === 'ArrowUp' && items.length) { cur = (cur - 1 + items.length) % items.length; paint(); ev.preventDefault(); }
+      else if (ev.key === 'Enter') { run(cur < 0 ? 0 : cur); ev.preventDefault(); }
+      else if (ev.key === 'Escape') { close(); ev.stopPropagation(); }
+    });
+    box.addEventListener('mousedown', ev => { const b = ev.target.closest('[data-i]'); if (b) { ev.preventDefault(); run(+b.dataset.i); } });
+    input.addEventListener('blur', () => setTimeout(close, 120));
+  }
+
+  /* ---------- เหตุการณ์ ---------- */
+  function setFilter(k, v) { state.f[k] = v; renderFilters(); apply(); if (state.sel) { const d = find(state.sel); if (d && d._off) select(null); } else showSummary(); }
+  function wire() {
+    const menu = document.getElementById('filter-menu');
+    menu.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-facet]');
+      if (b) { const k = b.dataset.facet, v = b.dataset.val; setFilter(k, state.f[k] === v ? 'all' : v); return; }
+      const a = ev.target.closest('[data-acc]');
+      if (a) { a.classList.toggle('active'); document.getElementById(a.dataset.acc).classList.toggle('open'); }
+    });
+    document.getElementById('f-party').addEventListener('change', e => setFilter('party', e.target.value));
+    document.getElementById('f-cat').addEventListener('change', e => setFilter('cat', e.target.value));
+    document.getElementById('reset').addEventListener('click', () => { state.f = { ...DEFAULT }; renderFilters(); select(null); fit(true); });
+    document.getElementById('z-in').addEventListener('click', () => { state.fitted = false; svg.transition().duration(dur(200)).call(zoom.scaleBy, 1.5); });
+    document.getElementById('z-out').addEventListener('click', () => { state.fitted = false; svg.transition().duration(dur(200)).call(zoom.scaleBy, 1 / 1.5); });
+    document.getElementById('z-fit').addEventListener('click', () => fit(true));
+    const side = document.getElementById('sidebar');
+    side.addEventListener('click', ev => {
+      if (ev.target.closest('#side-close') || ev.target.closest('#side-back')) return select(null);
+      const tb = ev.target.closest('[data-tab]'); if (tb) { state.tab = tb.dataset.tab; showSummary(); return; }
+      const mb = ev.target.closest('[data-metric]'); if (mb) { state.metric = mb.dataset.metric; state.keepSummaryScroll = true; showSummary(); return; }
+      const cb = ev.target.closest('[data-cat]'); if (cb) { state.keepSummaryScroll = true; setFilter('cat', state.f.cat === cb.dataset.cat ? 'all' : cb.dataset.cat); return; }
+      const b = ev.target.closest('[data-sel]'); if (b) select(b.dataset.sel, { focus: true });
+    });
+    side.addEventListener('change', ev => { if (ev.target.id === 'mp-sort') select(ev.target.dataset.mp, { sort: ev.target.value, keepScroll: true }); if (ev.target.id === 'cat-sort') select(ev.target.dataset.cat, { sort: ev.target.value, keepScroll: true }); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.sel) select(null); });
+    const ft = document.getElementById('fm-toggle');
+    ft.addEventListener('click', () => { const c = menu.classList.toggle('fm-collapsed'); ft.setAttribute('aria-expanded', String(!c)); document.getElementById('fm-arrow').textContent = c ? '▼ แสดง' : '▲ ซ่อน'; });
+    if (innerWidth <= 1000) { menu.classList.add('fm-collapsed'); ft.setAttribute('aria-expanded', 'false'); document.getElementById('fm-arrow').textContent = '▼ แสดง'; document.getElementById('legend').open = false; }
+    let t; new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => { if (!svg) return; if (state.fitted) fit(false); else state.fitK = fitTransform().k; }, 120); }).observe(document.getElementById('graph'));
+    wireSearch();
+  }
+
+  Promise.all([d3.csv(BUSINESS_CSV), d3.csv(RESULT_CSV), d3.csv('mp2569_list.csv').catch(() => []), d3.csv('gov_projects.csv').catch(() => null)]).then(([rows, results, mpList, govRows]) => {
+    build(rows, results, mpList, govRows); layout(); draw(); wire(); renderFilters(); apply(); showSummary(); fit(false); apply();
+    window.__mpBusiness = { mps, companies, others, cats, edges, state };
+  }).catch(err => {
+    console.error('โหลดข้อมูลไม่สำเร็จ:', err);
+    document.getElementById('title').textContent = 'โหลดข้อมูลไม่สำเร็จ';
+    const m = document.getElementById('msg'); m.hidden = false;
+    m.textContent = `โหลด ${BUSINESS_CSV} หรือ ${RESULT_CSV} ไม่ได้ กรุณาวางไฟล์ไว้โฟลเดอร์เดียวกับหน้านี้ แล้วเปิดผ่าน GitHub Pages หรือเว็บเซิร์ฟเวอร์`;
+  });
+})();
+</script>
+</body>
+</html>
