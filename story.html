@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เลือกตั้ง 2569 — เล่าผ่านแผนที่</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root { --bg:#f7f4ee; --ink:#222; --slate:#2D3748; --muted:#64748b; --card:#fff; --line:#e2e8f0; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { font-family:'Kanit',sans-serif; background:var(--bg); color:var(--ink); margin:0; overflow:hidden; }
+  a { color:inherit; }
+  .topbar { position:fixed; top:0; left:0; right:0; z-index:20; height:4px; }
+  .topbar i { display:block; height:100%; width:0; background:var(--slate); transition:width .4s; }
+
+  .deck { display:flex; height:100vh; height:100dvh; max-width:1180px; margin:0 auto; padding:0 20px; gap:24px; }
+  .panel { flex:0 0 min(440px,42%); display:flex; flex-direction:column; justify-content:center; gap:14px; min-width:0; }
+  .cardwrap { transition:opacity .25s, transform .25s; }
+  .cardwrap.out { opacity:0; transform:translateY(8px); }
+  .card { background:var(--card); border-radius:10px; padding:18px 18px 16px; box-shadow:0 2px 8px rgba(0,0,0,.08); border-left:4px solid var(--slate); }
+  .card .no { font-size:12px; font-weight:600; color:var(--muted); }
+  .card h2 { font-size:21px; line-height:1.3; margin:2px 0 8px; color:var(--slate); font-weight:600; }
+  .card p { font-size:15px; line-height:1.7; color:#334155; margin:0 0 8px; }
+  .card b.hl { color:#b91c1c; }
+  .card .note { font-size:12px; color:var(--muted); line-height:1.55; margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1; }
+  .card.cover { border-left:none; background:var(--slate); color:#fff; padding:26px 24px; }
+  .card.cover .no { color:#cbd5e1; letter-spacing:.06em; }
+  .card.cover h2 { color:#fff; font-size:clamp(26px,3.4vw,36px); line-height:1.2; margin:6px 0 12px; }
+  .card.cover p { color:#e2e8f0; }
+  .btn { display:inline-block; background:var(--slate); color:#fff; text-decoration:none; padding:9px 20px; border-radius:6px; font-size:14px; font-weight:600; border:0; cursor:pointer; font-family:inherit; }
+  .card.cover .btn { background:#fff; color:var(--slate); margin-top:6px; }
+  .soon { background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 12px; margin:10px 0; font-size:12.5px; color:#64748b; line-height:1.6; }
+  .kpis { display:flex; gap:10px; margin:10px 0 4px; flex-wrap:wrap; }
+  .kpi { flex:1 1 90px; background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .kpi b { display:block; font-size:24px; line-height:1.1; }
+  .kpi span { font-size:11px; color:var(--muted); }
+  .sbar { display:flex; height:18px; border-radius:4px; overflow:hidden; margin:8px 0 4px; background:#e2e8f0; }
+  .sbar i { display:block; height:100%; }
+  .sbar-leg { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; color:#475569; }
+  .sbar-leg span::before { content:''; display:inline-block; width:9px; height:9px; border-radius:2px; background:var(--c); margin-right:4px; }
+  .cmp { display:grid; grid-template-columns:auto 1fr 1fr; gap:4px 12px; font-size:13px; margin:8px 0; align-items:center; }
+  .cmp .h { font-size:11px; color:var(--muted); font-weight:600; }
+  .cmp .n { font-weight:600; }
+
+  .nav { display:flex; align-items:center; gap:10px; }
+  .nav button { font-family:inherit; font-size:14px; font-weight:600; border:0; border-radius:6px; padding:9px 16px; cursor:pointer; background:var(--slate); color:#fff; }
+  .nav button.ghost { background:#fff; color:var(--slate); border:1px solid #cbd5e1; }
+  .nav button:disabled { opacity:.35; cursor:default; }
+  .nav button:focus-visible { outline:3px solid #93c5fd; outline-offset:2px; }
+  .nav .grow { flex:1; display:flex; justify-content:center; gap:7px; flex-wrap:wrap; }
+  .nav button.dot { width:10px; height:10px; min-width:10px; border-radius:50%; background:#cbd5e1; border:0; padding:0; cursor:pointer; }
+  .nav button.dot.on { background:var(--slate); transform:scale(1.3); }
+  .hintkeys { font-size:11px; color:var(--muted); text-align:center; }
+
+  .stage { flex:1 1 auto; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 0; min-width:0; }
+  .stage-in { position:relative; height:calc(100vh - 150px); height:calc(100dvh - 150px); aspect-ratio:940/1420; max-width:100%; }
+  #map, #sankey { position:absolute; inset:0; width:100%; height:100%; }
+  #sankey { opacity:0; pointer-events:none; transition:opacity .5s; background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  #sankey.show { opacity:1; }
+  #map { transition:opacity .5s; }
+  .zone rect { stroke:#fff; stroke-width:1; }
+  .zone.ring rect { stroke:#111; stroke-width:2.2; }
+  .prov-label { font-size:10.5px; fill:#475569; font-weight:500; pointer-events:none; }
+  .legend { margin-top:10px; background:#fff; border-radius:10px; padding:8px 14px; box-shadow:0 2px 8px rgba(0,0,0,.08); font-size:12px; display:flex; flex-wrap:wrap; gap:4px 14px; justify-content:center; min-height:34px; max-width:100%; }
+  .legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:2px; background:var(--c); margin-right:5px; vertical-align:-1px; }
+  .legend .cap { color:var(--muted); width:100%; text-align:center; font-size:11px; }
+
+  @media (max-width:820px){
+    .deck { flex-direction:column; padding:0 12px; gap:0; }
+    .stage { order:1; flex:0 0 auto; height:44vh; height:44dvh; padding:6px 0 0; }
+    .stage-in { height:calc(44dvh - 50px); }
+    .legend { margin-top:4px; padding:4px 10px; font-size:11px; }
+    .panel { order:2; flex:1 1 auto; justify-content:flex-start; padding:8px 0 10px; min-height:0; }
+    .cardwrap { overflow-y:auto; min-height:0; flex:1 1 auto; }
+    .card h2 { font-size:18px; } .card p { font-size:14px; line-height:1.6; }
+    .hintkeys { display:none; }
+  }
+</style></head>
+<body>
+<div class="topbar"><i id="prog"></i></div>
+<div class="deck">
+  <div class="panel">
+    <div class="cardwrap" id="cardwrap" aria-live="polite"></div>
+    <div class="nav">
+      <button class="ghost" id="prev" aria-label="ย้อนกลับ">← ย้อนกลับ</button>
+      <div class="grow" id="dots"></div>
+      <button id="next" aria-label="ถัดไป">ถัดไป →</button>
+    </div>
+    <div class="hintkeys">กด ← → บนคีย์บอร์ด หรือปัดซ้าย-ขวาเพื่อเปลี่ยนตอน</div>
+  </div>
+  <div class="stage">
+    <div class="stage-in">
+      <svg id="map" viewBox="100 20 940 1420" role="img" aria-label="แผนที่ 400 เขตเลือกตั้ง"></svg>
+      <svg id="sankey" viewBox="0 0 400 560" role="img" aria-label="การย้ายพรรคของผู้สมัคร"></svg>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<script>
+  const partyColors = {
+    'ภูมิใจไทย': '#322485',
+    'ประชาชน': '#FF6411',
+    'ก้าวไกล': '#F77831',
+    'เพื่อไทย': '#D60003',
+    'กล้าธรรม': '#48CB74',
+    'ประชาธิปัตย์': '#01A4E4',
+    'รวมไทยสร้างชาติ': '#272D80',
+    'พลังประชารัฐ': '#086A3B',
+    'ไทรวมพลัง': '#FD318C',
+    'เพื่อไทรวมพลัง': '#FD318C',
+    'ประชาชาติ': '#A46D06',
+    'ไทยสร้างไทย': '#5A0F9D',
+    'ชาติไทยพัฒนา': '#E71485',
+    'เสรีรวมไทย': '#D8B720',
+    'โอกาสใหม่': '#F1666B',
+    // สีตามแม่แบบ "สีประจำพรรคการเมืองไทย" (th.wikipedia.org)
+    'ไทยก้าวใหม่': '#F7EB00',
+    'ประชาธิปไตยใหม่': '#FA5816',
+    'ประชากรไทย': '#00CED1',
+    'ไทยภักดี': '#00C13A',
+    'เศรษฐกิจ': '#FFBE3E',
+  };
+  const regionMap = {
+    'เชียงราย': 'เหนือ', 'น่าน': 'เหนือ', 'พะเยา': 'เหนือ', 'เชียงใหม่': 'เหนือ', 'แม่ฮ่องสอน': 'เหนือ', 'แพร่': 'เหนือ', 'ลำปาง': 'เหนือ', 'ลำพูน': 'เหนือ', 'อุตรดิตถ์': 'เหนือ',
+    'กรุงเทพมหานคร': 'กลาง', 'พิษณุโลก': 'กลาง', 'สุโขทัย': 'กลาง', 'เพชรบูรณ์': 'กลาง', 'พิจิตร': 'กลาง', 'กำแพงเพชร': 'กลาง', 'นครสวรรค์': 'กลาง', 'ลพบุรี': 'กลาง', 'ชัยนาท': 'กลาง', 'อุทัยธานี': 'กลาง', 'สิงห์บุรี': 'กลาง', 'อ่างทอง': 'กลาง', 'สระบุรี': 'กลาง', 'พระนครศรีอยุธยา': 'กลาง', 'สุพรรณบุรี': 'กลาง', 'นครนายก': 'กลาง', 'นนทบุรี': 'กลาง', 'ปทุมธานี': 'กลาง', 'นครปฐม': 'กลาง', 'สมุทรปราการ': 'กลาง', 'สมุทรสาคร': 'กลาง', 'สมุทรสงคราม': 'กลาง', 'กานต์จนบุรี': 'กลาง',
+    'หนองคาย': 'อีสาน', 'นครพนม': 'อีสาน', 'สกลนคร': 'อีสาน', 'อุดรธานี': 'อีสาน', 'หนองบัวลำภู': 'อีสาน', 'เลย': 'อีสาน', 'มุกดาหาร': 'อีสาน', 'กาฬสินธุ์': 'อีสาน', 'ขอนแก่น': 'อีสาน', 'อำนาจเจริญ': 'อีสาน', 'ยโสธร': 'อีสาน', 'ร้อยเอ็ด': 'อีสาน', 'มหาสารคาม': 'อีสาน', 'ชัยภูมิ': 'อีสาน', 'นครราชสีมา': 'อีสาน', 'บุรีรัมย์': 'อีสาน', 'สุรินทร์': 'อีสาน', 'ศรีสะเกษ': 'อีสาน', 'อุบลราชธานี': 'อีสาน', 'บึงกาฬ': 'อีสาน',
+    'สระแก้ว': 'ตะวันออก', 'ปราจีนบุรี': 'ตะวันออก', 'ฉะเชิงเทรา': 'ตะวันออก', 'ชลบุรี': 'ตะวันออก', 'ระยอง': 'ตะวันออก', 'จันทบุรี': 'ตะวันออก', 'ตราด': 'ตะวันออก',
+    'ตาก': 'ตะวันตก', 'กาญจนบุรี': 'ตะวันตก', 'ราชบุรี': 'ตะวันตก', 'เพชรบุรี': 'ตะวันตก', 'ประจวบคีรีขันธ์': 'ตะวันตก',
+    'ชุมพร': 'ใต้', 'ระนอง': 'ใต้', 'สุราษฎร์ธานี': 'ใต้', 'นครศรีธรรมราช': 'ใต้', 'กระบี่': 'ใต้', 'พังงา': 'ใต้', 'ภูเก็ต': 'ใต้', 'พัทลุง': 'ใต้', 'ตรัง': 'ใต้', 'ปัตตานี': 'ใต้', 'สงขลา': 'ใต้', 'สตูล': 'ใต้', 'นราธิวาส': 'ใต้', 'ยะลา': 'ใต้'
+  };
+
+  // 3. เลย์เอาต์ตำแหน่งเขตเลือกตั้ง
+  const L = {
+    'เชียงราย':  { o:[355,65],  rows:[[0,3],[-22,3],[-22,1]], label:[362,43,'m'] },
+    'เชียงใหม่': { o:[231,106], rows:[[0,3],[0,3],[0,2],[0,1],[0,1]], label:[239,84,'m'] },
+    'แม่ฮ่องสอน':{ o:[185,170], rows:[[0,1],[0,1]], label:[175,148,'m'] },
+    'ลำพูน':     { o:[285,195], rows:[[0,1],[0,1]], label:[285,170,'m'] },
+    'ลำปาง':     { o:[339,163], rows:[[0,2],[0,2]], label:[338,141,'m'] },
+    'พะเยา':     { o:[398,127], rows:[[0,3]], label:[408,105,'m'] },
+    'แพร่':      { o:[406,176], rows:[[0,1],[0,1],[0,1]], label:[406,157,'m'] },
+    'น่าน':      { o:[511,130], rows:[[0,1],[-10,1],[-22,1]], label:[483,130,'m'] },
+    'อุตรดิตถ์': { o:[533,198], rows:[[0,1],[-22,2]], label:[462,219,'m'] },
+    'ตาก':       { o:[204,257], rows:[[0,1],[14,1],[28,1]], label:[201,237,'m'] },
+    'สุโขทัย':   { o:[322,236], rows:[[0,2],[0,2]], label:[333,214,'m'] },
+    'พิษณุโลก':  { o:[405,271], rows:[[0,3],[0,2]], label:[422,250,'m'] },
+    'พิจิตร':    { o:[335,316], rows:[[0,3]], label:[360,295,'m'] },
+    'กำแพงเพชร': { o:[276,311], rows:[[0,2],[0,2]], label:[286,288,'m'] },
+    'อุทัยธานี': { o:[264,370], rows:[[0,1],[11,1]], label:[224,368,'m'] },
+    'นครสวรรค์': { o:[333,370], rows:[[0,4],[44,2]], label:[352,347,'m'] },
+    'เพชรบูรณ์': { o:[450,358], rows:[[0,2],[0,2],[0,2]], label:[469,336,'m'] },
+
+    'เลย':        { o:[485,259], rows:[[0,1],[0,1],[0,2]], label:[511,275,'m'] },
+    'หนองคาย':    { o:[593,196], pts:[[0,0],[22,12],[44,0]], label:[613,173,'m'] },
+    'บึงกาฬ':     { o:[681,190], rows:[[0,3]], label:[693,168,'m'] },
+    'หนองบัวลำภู':{ o:[545,323], rows:[[0,3]], label:[568,300,'m'] },
+    'อุดรธานี':   { o:[619,257], rows:[[0,5],[0,5]], label:[627,236,'m'] },
+    'สกลนคร':     { o:[759,228], rows:[[0,2],[0,2],[0,2],[0,1]], label:[769,205,'m'] },
+    'นครพนม':     { o:[814,239], pts:[[0,0],[11,22],[21,44],[11,65]], label:[829,238,'s'] },
+    'กาฬสินธุ์':  { o:[720,348], rows:[[0,3],[0,3]], label:[726,323,'m'] },
+    'มุกดาหาร':   { o:[831,340], pts:[[0,0],[0,24]], label:[846,336,'s'] },
+    'อำนาจเจริญ': { o:[866,389], pts:[[0,0],[20,22]], label:[885,386,'s'] },
+    'ชัยภูมิ':    { o:[531,385], rows:[[0,2],[0,2],[0,3]], label:[531,363,'m'] },
+    'ขอนแก่น':    { o:[611,370], rows:[[0,3],[22,2],[22,2],[22,2],[22,2]], label:[627,347,'m'] },
+    'มหาสารคาม':  { o:[721,435], rows:[[0,2],[0,2],[0,2]], label:[732,413,'m'] },
+    'ร้อยเอ็ด':   { o:[785,424], rows:[[0,2],[0,2],[0,2],[0,2]], label:[797,401,'m'] },
+    'ยโสธร':      { o:[859,454], rows:[[0,1],[0,1],[0,1]], label:[857,432,'m'] },
+    'อุบลราชธานี':{ o:[918,452], rows:[[0,1],[0,2],[0,2],[0,2],[0,2],[0,2]], label:[935,452,'s'] },
+    'นครราชสีมา': { o:[511,498], rows:[[0,6],[0,6],[0,4]], label:[537,476,'m'] },
+    'บุรีรัมย์':  { o:[679,532], rows:[[0,2],[0,2],[0,2],[0,2],[0,2]], label:[680,511,'m'] },
+    'สุรินทร์':   { o:[766,561], rows:[[0,2],[-22,3],[-22,3]], label:[743,540,'m'] },
+    'ศรีสะเกษ':   { o:[833,562], rows:[[0,3],[0,3],[0,3]], label:[856,540,'m'] },
+
+    'ชัยนาท':    { o:[287,427], rows:[[0,2]], label:[248,425,'m'] },
+    'สิงห์บุรี':  { o:[396,430], rows:[[0,1]], label:[360,429,'m'] },
+    'ลพบุรี':    { o:[482,430], rows:[[0,1],[-44,3]], label:[452,428,'m'] },
+    'อ่างทอง':   { o:[376,469], rows:[[0,2]], label:[339,470,'m'] },
+    'สระบุรี':   { o:[438,513], rows:[[0,2],[0,2]], label:[462,491,'m'] },
+    'พระนครศรีอยุธยา': { o:[354,525], rows:[[0,3],[22,2]], label:[367,503,'m'], text:'อยุธยา' },
+    'สุพรรณบุรี':{ o:[271,474], rows:[[0,2],[0,2],[22,1]], label:[227,474,'m'] },
+    'กาญจนบุรี': { o:[240,559], rows:[[0,1],[11,1],[22,1],[32,1],[43,1]], label:[234,535,'m'] },
+    'นครปฐม':    { o:[322,588], rows:[[0,2],[0,2],[0,2]], label:[334,567,'m'] },
+    'ปทุมธานี':  { o:[404,582], rows:[[0,4],[0,4]], label:[455,559,'m'] },
+    'นนทบุรี':   { o:[420,657], rows:[[0,4],[0,4]], label:[430,635,'m'] },
+    'สมุทรสาคร': { o:[359,661], rows:[[0,2],[0,2]], label:[310,680,'m'] },
+    'สมุทรสงคราม':{ o:[359,715], rows:[[0,1]], label:[300,714,'m'] },
+    'สมุทรปราการ':{ o:[394,717], rows:[[0,5],[44,3]], label:[452,761,'m'] },
+    'ราชบุรี':   { o:[337,751], rows:[[0,2],[0,3]], label:[298,748,'m'] },
+    'เพชรบุรี':  { o:[343,805], rows:[[0,1],[0,2]], label:[305,802,'m'] },
+    'ประจวบคีรีขันธ์': { o:[341,866], rows:[[0,1],[-16,1],[-28,1]], label:[280,861,'m'] },
+    'กรุงเทพมหานคร': { o:[465,902], rows:[[0,8],[0,9],[0,9],[44,7]], label:[501,882,'m'] },
+
+    'นครนายก':   { o:[522,630], rows:[[0,2]], label:[535,610,'m'] },
+    'ปราจีนบุรี':{ o:[613,598], rows:[[0,1],[0,1],[0,1]], label:[613,575,'m'] },
+    'สระแก้ว':   { o:[703,663], rows:[[0,2],[0,1]], label:[718,685,'s'] },
+    'ฉะเชิงเทรา':{ o:[595,698], rows:[[0,4]], label:[615,677,'m'] },
+    'ชลบุรี':    { o:[524,701], rows:[[0,2],[0,3],[0,3],[0,1],[0,1]], label:[523,809,'m'] },
+    'ระยอง':     { o:[571,785], rows:[[0,3],[22,2]], label:[594,766,'m'] },
+    'จันทบุรี':  { o:[643,740], rows:[[0,1],[0,2]], label:[657,740,'s'] },
+    'ตราด':      { o:[672,816], rows:[[0,1]], label:[672,834,'m'] },
+
+    'ชุมพร':          { o:[310,944],  rows:[[0,1],[-13,1],[-22,1]], label:[272,943,'m'] },
+    'ระนอง':          { o:[254,1009], rows:[[0,1]], label:[218,1006,'m'] },
+    'สุราษฎร์ธานี':   { o:[289,1021], rows:[[0,2],[0,2],[0,2],[22,1]], label:[331,1018,'s'] },
+    'พังงา':          { o:[256,1055], rows:[[0,1],[0,1]], label:[224,1053,'m'] },
+    'นครศรีธรรมราช':  { o:[373,1063], rows:[[0,1],[0,1],[0,2],[0,2],[-22,3]], label:[388,1079,'s'] },
+    'กระบี่':         { o:[276,1135], rows:[[0,2],[0,1]], label:[276,1114,'m'] },
+    'ภูเก็ต':         { o:[237,1157], rows:[[0,1],[0,1],[0,1]], label:[206,1157,'m'] },
+    'ตรัง':           { o:[303,1205], rows:[[0,2],[0,2]], label:[274,1202,'m'] },
+    'พัทลุง':         { o:[365,1193], rows:[[0,1],[0,2]], label:[379,1193,'s'] },
+    'สตูล':           { o:[325,1265], rows:[[0,1],[0,1]], label:[295,1258,'m'] },
+    'สงขลา':          { o:[367,1253], rows:[[0,3],[0,3],[0,3]], label:[372,1327,'m'] },
+    'ปัตตานี':        { o:[460,1272], rows:[[0,2],[0,3]], label:[470,1250,'m'] },
+    'ยะลา':           { o:[460,1329], rows:[[0,2],[22,1]], label:[449,1350,'m'] },
+    'นราธิวาส':       { o:[525,1351], rows:[[0,2],[0,3]], label:[541,1396,'m'] }
+  };
+
+  // แมประดับ GPP สำรองตามชื่อจังหวัด ( fallback ในกรณีที่ไม่มีคอลัมน์ใน CSV )
+  const defaultGppMap = {
+    'ระยอง': 'สูงมาก', 'ชลบุรี': 'สูงมาก', 'ฉะเชิงเทรา': 'สูงมาก', 'กรุงเทพมหานคร': 'สูงมาก', 'สมุทรสาคร': 'สูงมาก', 'ภูเก็ต': 'สูงมาก', 'ปราจีนบุรี': 'สูงมาก', 'สระบุรี': 'สูงมาก', 'พระนครศรีอยุธยา': 'สูงมาก', 'ปทุมธานี': 'สูงมาก',
+    'นนทบุรี': 'สูง', 'นครปฐม': 'สูง', 'สมุทรปราการ': 'สูง', 'เพชรบุรี': 'สูง', 'ประจวบคีรีขันธ์': 'สูง', 'สุราษฎร์ธานี': 'สูง', 'กระบี่': 'สูง', 'พังงา': 'สูง', 'สงขลา': 'สูง', 'ขอนแก่น': 'สูง', 'นครราชสีมา': 'สูง', 'เชียงใหม่': 'สูง', 'ลำพูน': 'สูง', 'ราชบุรี': 'สูง', 'ตราด': 'สูง', 'จันทบุรี': 'สูง', 'ชุมพร': 'สูง', 'ระนอง': 'สูง',
+    'เชียงราย': 'ปานกลาง', 'พิษณุโลก': 'ปานกลาง', 'นครสวรรค์': 'ปานกลาง', 'สุพรรณบุรี': 'ปานกลาง', 'กาญจนบุรี': 'ปานกลาง', 'กานต์จนบุรี': 'ปานกลาง', 'ลพบุรี': 'ปานกลาง', 'สระแก้ว': 'ปานกลาง', 'อุดรธานี': 'ปานกลาง', 'อุบลราชธานี': 'ปานกลาง', 'ตรัง': 'ปานกลาง', 'พัทลุง': 'ปานกลาง', 'สตูล': 'ปานกลาง', 'ตาก': 'ปานกลาง', 'เพชรบูรณ์': 'ปานกลาง', 'กำแพงเพชร': 'ปานกลาง', 'พิจิตร': 'ปานกลาง', 'สุโขทัย': 'ปานกลาง', 'อุตรดิตถ์': 'ปานกลาง', 'ลำปาง': 'ปานกลาง', 'แพร่': 'ปานกลาง', 'พะเยา': 'ปานกลาง', 'น่าน': 'ปานกลาง', 'ชัยนาท': 'ปานกลาง', 'อ่างทอง': 'ปานกลาง', 'สิงห์บุรี': 'ปานกลาง', 'สมุทรสงคราม': 'ปานกลาง', 'นครนายก': 'ปานกลาง',
+    'แม่ฮ่องสอน': 'ต่ำ', 'อุทัยธานี': 'ต่ำ', 'เลย': 'ต่ำ', 'หนองคาย': 'ต่ำ', 'บึงกาฬ': 'ต่ำ', 'หนองบัวลำภู': 'ต่ำ', 'สกลนคร': 'ต่ำ', 'นครพนม': 'ต่ำ', 'กาฬสินธุ์': 'ต่ำ', 'มุกดาหาร': 'ต่ำ', 'ชัยภูมิ': 'ต่ำ', 'มหาสารคาม': 'ต่ำ', 'ร้อยเอ็ด': 'ต่ำ', 'ยโสธร': 'ต่ำ', 'อำนาจเจริญ': 'ต่ำ', 'บุรีรัมย์': 'ต่ำ', 'สุรินทร์': 'ต่ำ', 'ศรีสะเกษ': 'ต่ำ', 'นครศรีธรรมราช': 'ต่ำ', 'ปัตตานี': 'ต่ำ', 'ยะลา': 'ต่ำ', 'นราธิวาส': 'ต่ำ'
+  };
+
+  // รายชื่อ 'คนเดิมย้ายพรรค' จากไฟล์ สส66_ย้ายพรรค69.csv (68 เขต)
+  const SWITCHED_MAP = {
+    "กาฬสินธุ์_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "กาฬสินธุ์", "นายจำลอง  ภูนวนทา"],
+    "กำแพงเพชร_1": ["พลังประชารัฐ", "กล้าธรรม", 1, "กำแพงเพชร", "นายไผ่  ลิกค์"],
+    "กำแพงเพชร_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "กำแพงเพชร", "นายเพชรภูมิ  อาภรณ์รัตน์"],
+    "ฉะเชิงเทรา_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "ฉะเชิงเทรา", "นายอรรถกร  ศิริลัทธยากร"],
+    "ชัยภูมิ_7": ["พลังประชารัฐ", "กล้าธรรม", 7, "ชัยภูมิ", "นายอัครแสนคีรี  โล่ห์วีระ"],
+    "ตาก_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "ตาก", "นายภาคภูมิ  บูลย์ประมุข"],
+    "นครปฐม_2": ["รวมไทยสร้างชาติ", "กล้าธรรม", 2, "นครปฐม", "พันโทสินธพ  แก้วพิจิตร"],
+    "นครสวรรค์_3": ["รวมไทยสร้างชาติ", "กล้าธรรม", 3, "นครสวรรค์", "นายสัญญา  นิลสุพรรณ"],
+    "นราธิวาส_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "นราธิวาส", "นายอามินทร์  มะยูโซ๊ะ"],
+    "นราธิวาส_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "นราธิวาส", "นายสัมพันธ์  มะยูโซ๊ะ"],
+    "ประจวบคีรีขันธ์_2": ["ประชาธิปัตย์", "กล้าธรรม", 2, "ประจวบคีรีขันธ์", "นายจักพันธ์  ปิยพรไพบูลย์"],
+    "ปัตตานี_4": ["ประชาธิปัตย์", "กล้าธรรม", 4, "ปัตตานี", "นายยูนัยดี  วาบา"],
+    "พะเยา_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "พะเยา", "นายอนุรัตน์  ตันบรรจง"],
+    "พะเยา_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "พะเยา", "นายจีรเดช  ศรีวิราช"],
+    "ราชบุรี_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "ราชบุรี", "นางบุญยิ่ง  นิติกาญจนา"],
+    "ราชบุรี_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "ราชบุรี", "นายจตุพร  กมลพันธ์ทิพย์"],
+    "ร้อยเอ็ด_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "ร้อยเอ็ด", "นางรัชนี  พลซื่อ"],
+    "สกลนคร_2": ["ประชาธิปัตย์", "กล้าธรรม", 2, "สกลนคร", "นายชาตรี  หล้าพรหม"],
+    "สงขลา_4": ["พลังประชารัฐ", "กล้าธรรม", 4, "สงขลา", "นายชนนพัฒฐ์  นาคสั้ว"],
+    "สงขลา_8": ["ประชาธิปัตย์", "กล้าธรรม", 8, "สงขลา", "พลตำรวจตรีสุรินทร์  ปาลาเร่"],
+    "สระบุรี_4": ["พลังประชารัฐ", "กล้าธรรม", 4, "สระบุรี", "นายองอาจ  วงษ์ประยูร"],
+    "สุราษฎร์ธานี_5": ["รวมไทยสร้างชาติ", "กล้าธรรม", 5, "สุราษฎร์ธานี", "นายปรเมษฐ์  จินา"],
+    "เชียงใหม่_9": ["พลังประชารัฐ", "กล้าธรรม", 9, "เชียงใหม่", "นายนเรศ  ธำรงค์ทิพยคุณ"],
+    "แม่ฮ่องสอน_1": ["พลังประชารัฐ", "กล้าธรรม", 1, "แม่ฮ่องสอน", "นายปกรณ์  จีนาคำ"],
+    "ชลบุรี_4": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 4, "ชลบุรี", "นายจิรวุฒิ  สิงห์โตทอง"],
+    "ชลบุรี_5": ["เพื่อไทย", "ภูมิใจไทย", 5, "ชลบุรี", "นายอนันต์  ปรีดาสุทธิจิตต์"],
+    "ชุมพร_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "ชุมพร", "นายวิชัย  สุดสวาสดิ์"],
+    "ชุมพร_3": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 3, "ชุมพร", "นายสุพล  จุลใส"],
+    "ตรัง_2": ["พลังประชารัฐ", "ภูมิใจไทย", 2, "ตรัง", "นายทวี  สุระบาล"],
+    "นครนายก_2": ["เพื่อไทย", "ภูมิใจไทย", 2, "นครนายก", "นายเกรียงไกร  กิตติธเนศวร"],
+    "นครปฐม_1": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 1, "นครปฐม", "นายศุภโชค  ศรีสุขจร"],
+    "นครปฐม_3": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 3, "นครปฐม", "นายพาณุวัฒณ์  สะสมทรัพย์"],
+    "นครปฐม_5": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 5, "นครปฐม", "นายอนุชา  สะสมทรัพย์"],
+    "นครศรีธรรมราช_8": ["ประชาธิปัตย์", "ภูมิใจไทย", 9, "นครศรีธรรมราช", "นางอวยพรศรี  เชาวลิต"],
+    "นครศรีธรรมราช_9": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 10, "นครศรีธรรมราช", "นางสาวพิมพ์ภัทรา  วิชัยกุล"],
+    "นครสวรรค์_6": ["ชาติพัฒนากล้า", "ภูมิใจไทย", 6, "นครสวรรค์", "นายประสาท  ตันประเสริฐ"],
+    "ปัตตานี_2": ["พลังประชารัฐ", "ภูมิใจไทย", 2, "ปัตตานี", "นายคอซีย์  มามุ"],
+    "ปัตตานี_5": ["ประชาชาติ", "ภูมิใจไทย", 5, "ปัตตานี", "นายสาเหะมูหามัด  อัลอิดรุส"],
+    "พังงา_2": ["พลังประชารัฐ", "ภูมิใจไทย", 2, "พังงา", "นายฉกาจ  พัฒนกิจวิบูลย์"],
+    "พิษณุโลก_3": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 3, "พิษณุโลก", "นายพงษ์มนู  ทองหนัก"],
+    "มุกดาหาร_1": ["พลังประชารัฐ", "ภูมิใจไทย", 1, "มุกดาหาร", "นายวิริยะ  ทองผา"],
+    "ยโสธร_1": ["ไทยสร้างไทย", "ภูมิใจไทย", 1, "ยโสธร", "นางสุภาพร  สลับศรี"],
+    "ราชบุรี_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "ราชบุรี", "นางสาวกุลวลี  นพอมรบดี"],
+    "ราชบุรี_4": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 4, "ราชบุรี", "นายอัครเดช  วงษ์พิทักษ์โรจน์"],
+    "ร้อยเอ็ด_1": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 1, "ร้อยเอ็ด", "นายอนุรักษ์  จุรีมาศ"],
+    "สงขลา_1": ["ประชาธิปัตย์", "ภูมิใจไทย", 1, "สงขลา", "นายสรรเพชญ  บุญญามณี"],
+    "สงขลา_3": ["ประชาธิปัตย์", "ภูมิใจไทย", 3, "สงขลา", "นายสมยศ  พลายด้วง"],
+    "สระบุรี_2": ["เพื่อไทย", "ภูมิใจไทย", 2, "สระบุรี", "นายอรรถพล  วงษ์ประยูร"],
+    "สิงห์บุรี_1": ["พลังประชารัฐ", "ภูมิใจไทย", 1, "สิงห์บุรี", "นายโชติวุฒิ  ธนาคมานุสรณ์"],
+    "สุพรรณบุรี_1": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 1, "สุพรรณบุรี", "นายสรชัด  สุจิตต์"],
+    "สุพรรณบุรี_2": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 2, "สุพรรณบุรี", "นายณัฐวุฒิ  ประเสริฐสุวรรณ"],
+    "สุพรรณบุรี_4": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 4, "สุพรรณบุรี", "นายเสมอกัน  เที่ยงธรรม"],
+    "สุพรรณบุรี_5": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 5, "สุพรรณบุรี", "นายประภัตร  โพธสุธน"],
+    "สุราษฎร์ธานี_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "สุราษฎร์ธานี", "นางสาวกานสินี  โอภาสรังสรรค์"],
+    "สุราษฎร์ธานี_2": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 2, "สุราษฎร์ธานี", "นายพิพิธ  รัตนรักษ์"],
+    "อุดรธานี_3": ["ไทยสร้างไทย", "ภูมิใจไทย", 3, "อุดรธานี", "นายหรั่ง  ธุระพล"],
+    "อุดรธานี_6": ["ไทยสร้างไทย", "ภูมิใจไทย", 6, "อุดรธานี", "นายอดิศักดิ์  แก้วมุงคุณทรัพย์"],
+    "อุบลราชธานี_7": ["เพื่อไทย", "ภูมิใจไทย", 7, "อุบลราชธานี", "นางสาวสุดารัตน์  พิทักษ์พรพัลลภ"],
+    "เพชรบุรี_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "เพชรบุรี", "นางธิวัลรัตน์  อังกินันทน์"],
+    "เพชรบุรี_3": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 3, "เพชรบุรี", "จ่าอากาศเอกอภิชาติ  แก้วโกศล"],
+    "เพชรบูรณ์_1": ["พลังประชารัฐ", "ภูมิใจไทย", 1, "เพชรบูรณ์", "นางสาวพิมพ์พร  พรพฤฒิพันธุ์"],
+    "เพชรบูรณ์_3": ["พลังประชารัฐ", "ภูมิใจไทย", 3, "เพชรบูรณ์", "นายบุญชัย  กิตติธาราทรัพย์"],
+    "เพชรบูรณ์_4": ["พลังประชารัฐ", "ภูมิใจไทย", 4, "เพชรบูรณ์", "นายวรโชติ  สุคนธ์ขจร"],
+    "เพชรบูรณ์_5": ["พลังประชารัฐ", "ภูมิใจไทย", 5, "เพชรบูรณ์", "นางวันเพ็ญ  พร้อมพัฒน์"],
+    "เพชรบูรณ์_6": ["พลังประชารัฐ", "ภูมิใจไทย", 6, "เพชรบูรณ์", "นายอัคร  ทองใจสด"],
+    "แม่ฮ่องสอน_2": ["ประชาธิปัตย์", "ภูมิใจไทย", 2, "แม่ฮ่องสอน", "นายสมบัติ  ยะสินธุ์"],
+    "ชัยนาท_1": ["รวมไทยสร้างชาติ", "เพื่อไทย", 1, "ชัยนาท", "นายอนุชา  นาคาศัย"],
+    "สุราษฎร์ธานี_3": ["รวมไทยสร้างชาติ", "ไทรวมพลัง", 3, "สุราษฎร์ธานี", "นางสาววชิราภรณ์  กาญจนะ"],
+  };
+
+  const PITCH = 22;
+  const zoneCenters = {};
+  Object.entries(L).forEach(([name, cfg]) => {
+    const [ox, oy] = cfg.o;
+    let list = [];
+    if (cfg.pts) {
+      list = cfg.pts.map(([dx, dy]) => [ox + dx, oy + dy]);
+    } else {
+      cfg.rows.forEach(([dx, n], r) => {
+        for (let i = 0; i < n; i++) list.push([ox + dx + i * PITCH, oy + r * PITCH]);
+      });
+    }
+    zoneCenters[name] = list;
+  });
+
+  function getZoneCenter(provName, zoneNum) {
+    const list = zoneCenters[provName];
+    if (!list) return null;
+    if (list[zoneNum - 1]) return list[zoneNum - 1];
+    const last = list[list.length - 1];
+    return [last[0] + (zoneNum - list.length) * PITCH, last[1]];
+  }
+
+const normP = p => (p === 'ก้าวไกล' ? 'ประชาชน' : (p === 'เพื่อไทรวมพลัง' ? 'ไทรวมพลัง' : p));
+const colorOf = p => partyColors[p] || (p === 'ก้าวไกล' ? partyColors['ประชาชน'] : '#6B7280');
+const fmt = n => n.toLocaleString('en-US');
+const pct = (a, b, d = 1) => (a / b * 100).toFixed(d);
+
+function loadCSV(file) { return d3.csv(file).catch(() => []); }
+function parseCon(rows) {
+  const map = new Map();
+  rows.forEach(r => {
+    const prov = (r['จังหวัด'] || '').trim().replace('กานต์จนบุรี', 'กาญจนบุรี');
+    const zone = parseInt(r['เขต']); if (!prov || !zone) return;
+    const v = parseInt(String(r['คะแนน'] || r['ผลคะแนน'] || '0').replace(/,/g, '')) || 0;
+    const key = prov + '_' + zone;
+    if (!map.has(key)) map.set(key, { prov, zone, key, c: [] });
+    map.get(key).c.push({ party: normP((r['สังกัดพรรค'] || r['พรรค'] || '').trim()), v, bigfam: (r['บ้านใหญ่'] || '').trim() === 'ใช่' });
+  });
+  map.forEach(z => { z.c.sort((a, b) => b.v - a.v); z.total = d3.sum(z.c, c => c.v); z.win = z.c[0]; });
+  return map;
+}
+
+Promise.all(['election_result-con_69.csv', 'election_result-con_66.csv', 'election_result-party_69.csv', 'election_result-party_66.csv'].map(loadCSV))
+  .then(([c69r, c66r, p69r, p66r]) => {
+    const con69 = parseCon(c69r), con66 = parseCon(c66r), list69 = parseCon(p69r), list66 = parseCon(p66r);
+
+    // ---- รวมเป็นรายเขต ----
+    const zones = [];
+    Object.keys(zoneCenters).forEach(prov => {
+      zoneCenters[prov].forEach((_, i) => {
+        const key = prov + '_' + (i + 1), a = con69.get(key); if (!a) return;
+        const [cx, cy] = getZoneCenter(prov, i + 1);
+        const b = con66.get(key), l = list69.get(key);
+        zones.push({
+          key, prov, zone: i + 1, x: cx - 10, y: cy - 10,
+          w69: a.win.party, w66: b ? b.win.party : null, l69: l ? l.win.party : null,
+          margin: a.c[1] ? (a.c[0].v - a.c[1].v) / a.total * 100 : 100,
+          bigfam: a.c.some(c => c.bigfam), bigfamWin: a.win.bigfam,
+          switched: !!SWITCHED_MAP[key],
+        });
+      });
+    });
+    const N = zones.length;
+    const count = (arr, f) => d3.rollups(arr, v => v.length, f).sort((x, y) => y[1] - x[1]);
+    const seats69 = count(zones, z => z.w69), seats66 = count(zones.filter(z => z.w66), z => z.w66);
+    const seatOf = (arr, p) => (arr.find(x => x[0] === p) || [p, 0])[1];
+    const shareOf = (m, p) => { let t = 0, s = 0; m.forEach(z => z.c.forEach(c => { t += c.v; if (c.party === p) s += c.v; })); return t ? s / t * 100 : 0; };
+    const diffZones = zones.filter(z => z.l69 && z.l69 !== z.w69);
+    const bf = zones.filter(z => z.bigfam), nbf = zones.filter(z => !z.bigfam);
+    const bfDiff = bf.filter(z => z.l69 && z.l69 !== z.w69).length, nbfDiff = nbf.filter(z => z.l69 && z.l69 !== z.w69).length;
+    const close = zones.filter(z => z.margin < 5);
+    const changed = zones.filter(z => z.w66 && z.w66 !== z.w69);
+    const listWins69 = count(zones.filter(z => z.l69), z => z.l69);
+
+    // ---- วาดแผนที่ ----
+    const svg = d3.select('#map');
+    svg.selectAll('.prov-label').data(Object.entries(L).filter(([, c]) => c.label)).enter().append('text')
+      .attr('class', 'prov-label').attr('x', ([, c]) => c.label[0]).attr('y', ([, c]) => c.label[1])
+      .attr('text-anchor', ([, c]) => c.label[2] === 's' ? 'start' : 'middle').text(([n, c]) => c.text || n);
+    const g = svg.selectAll('.zone').data(zones, d => d.key).enter().append('g').attr('class', 'zone').attr('transform', d => `translate(${d.x},${d.y})`);
+    g.append('rect').attr('width', 20).attr('height', 20).attr('rx', 3).attr('fill', '#cbd5e1');
+    g.append('title').text(d => `${d.prov} เขต ${d.zone} · ${d.w69}`);
+
+    function paint({ fill, show = () => true, ring = () => false, faded = 0.14 }) {
+      g.classed('ring', d => ring(d));
+      g.select('rect').transition().duration(650)
+        .attr('fill', d => show(d) ? colorOf(fill(d) || '') : '#cbd5e1')
+        .attr('opacity', d => show(d) ? 1 : faded);
+      g.filter(d => ring(d)).raise();
+    }
+    function legend(parties, cap) {
+      d3.select('#legend').html((cap ? `<div class="cap">${cap}</div>` : '') +
+        parties.map(p => `<span style="--c:${colorOf(p)}">${p}</span>`).join(''));
+    }
+    const top = (arr, n = 5) => arr.slice(0, n).map(x => x[0]);
+    const bar = (arr, total) => `<div class="sbar">${arr.slice(0, 7).map(([p, n]) => `<i title="${p} ${n}" style="width:${n / total * 100}%;background:${colorOf(p)}"></i>`).join('')}</div>
+      <div class="sbar-leg">${arr.slice(0, 5).map(([p, n]) => `<span style="--c:${colorOf(p)}">${p} ${n}</span>`).join('')}</div>`;
+
+    // ---- Sankey การย้ายพรรค ----
+    const flows = d3.rollups(Object.values(SWITCHED_MAP), v => v.length, d => normP(d[0]), d => normP(d[1]));
+    const links = []; flows.forEach(([f, ts]) => ts.forEach(([t, n]) => links.push({ f, t, n })));
+    const nSw = d3.sum(links, l => l.n);
+    function drawSankey() {
+      const s = d3.select('#sankey'); s.selectAll('*').remove();
+      const W = 400, H = 560, top0 = 70, bot = 30, gap = 8, nodeW = 14, xl = 120, xr = 266;
+      const fromT = d3.rollups(links, v => d3.sum(v, d => d.n), d => d.f).sort((a, b) => b[1] - a[1]);
+      const toT = d3.rollups(links, v => d3.sum(v, d => d.n), d => d.t).sort((a, b) => b[1] - a[1]);
+      const unit = (H - top0 - bot - gap * Math.max(fromT.length, toT.length)) / nSw;
+      const place = (arr) => { let y = top0; const m = new Map(); arr.forEach(([p, n]) => { m.set(p, { y, h: n * unit, off: 0, n }); y += n * unit + gap; }); return m; };
+      const L0 = place(fromT), R0 = place(toT);
+      s.append('text').attr('x', W / 2).attr('y', 26).attr('text-anchor', 'middle').attr('font-size', 15).attr('font-weight', 600).attr('fill', '#2D3748').text(`ผู้สมัครคนเดิมที่ย้ายพรรค (${nSw} เขต)`);
+      s.append('text').attr('x', xl).attr('y', 52).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', '#64748b').text('พรรคเดิม (66)');
+      s.append('text').attr('x', xr + nodeW).attr('y', 52).attr('text-anchor', 'start').attr('font-size', 11).attr('fill', '#64748b').text('พรรคใหม่ (69)');
+      links.sort((a, b) => b.n - a.n).forEach(l => {
+        const a = L0.get(l.f), b = R0.get(l.t), h = l.n * unit;
+        const y0 = a.y + a.off + h / 2, y1 = b.y + b.off + h / 2; a.off += h; b.off += h;
+        const mx = (xl + nodeW + xr) / 2;
+        s.append('path').attr('d', `M${xl + nodeW},${y0} C${mx},${y0} ${mx},${y1} ${xr},${y1}`).attr('fill', 'none')
+          .attr('stroke', colorOf(l.t)).attr('stroke-opacity', .5).attr('stroke-width', Math.max(h, 1.5)).append('title').text(`${l.f} → ${l.t}: ${l.n} เขต`);
+      });
+      const node = (m, x, anchor, dx) => m.forEach((v, p) => {
+        s.append('rect').attr('x', x).attr('y', v.y).attr('width', nodeW).attr('height', Math.max(v.h, 2)).attr('rx', 2).attr('fill', colorOf(p));
+        s.append('text').attr('x', x + dx).attr('y', v.y + Math.max(v.h, 2) / 2 + 4).attr('text-anchor', anchor).attr('font-size', 12).attr('fill', '#1e293b').text(`${p} ${v.n}`);
+      });
+      node(L0, xl, 'end', -6); node(R0, xr, 'start', nodeW + 6);
+    }
+    drawSankey();
+    const sw1 = links.slice().sort((a, b) => b.n - a.n)[0];
+
+    // ---- ฉาก ----
+    const S = [
+      { id: 'result', no: 'ตอนที่ 1', title: 'ผลเลือกตั้งปี 69: ภูมิใจไทยชนะมากที่สุด',
+        html: `<p>จาก ${N} เขต <b>ภูมิใจไทยชนะ ${seatOf(seats69, 'ภูมิใจไทย')} เขต</b> (${pct(seatOf(seats69, 'ภูมิใจไทย'), N, 0)}%) ตามด้วยประชาชน ${seatOf(seats69, 'ประชาชน')} เขต</p>
+          <div class="kpis"><div class="kpi"><b style="color:${colorOf('ภูมิใจไทย')}">${seatOf(seats69, 'ภูมิใจไทย')}</b><span>เขตที่ภูมิใจไทยชนะ</span></div>
+          <div class="kpi"><b>${shareOf(con69, 'ภูมิใจไทย').toFixed(1)}%</b><span>ส่วนแบ่งคะแนนแบ่งเขตของภูมิใจไทยทั้งประเทศ</span></div></div>${bar(seats69, N)}
+          <div class="note">นับเฉพาะ ส.ส. แบ่งเขต 400 ที่นั่ง · ไม่รวม ส.ส. บัญชีรายชื่อ</div>`,
+        run: () => { paint({ fill: z => z.w69 }); legend(top(seats69), 'ผู้ชนะแบ่งเขต ปี 2569'); } },
+      { id: 'vs66', no: 'ตอนที่ 2', title: 'เทียบปี 66: ก้าวไกลหาย ภูมิใจไทยพุ่ง',
+        html: `<p>ปี 66 <b>ก้าวไกล</b> ชนะ ${seatOf(seats66, 'ประชาชน')} เขต ภูมิใจไทยได้ ${seatOf(seats66, 'ภูมิใจไทย')} เขต</p>
+          <p>ปี 69 ประชาชนเหลือ <b>${seatOf(seats69, 'ประชาชน')}</b> เขต ส่วนภูมิใจไทยเพิ่มเป็น <b class="hl">${seatOf(seats69, 'ภูมิใจไทย')}</b> เขต · <b>${changed.length}</b> เขตเปลี่ยนมือ (กรอบดำ)</p>
+          <div class="cmp"><span class="h"></span><span class="h">ปี 66</span><span class="h">ปี 69</span>
+          <span>ประชาชน/ก้าวไกล</span><span class="n">${seatOf(seats66, 'ประชาชน')}</span><span class="n">${seatOf(seats69, 'ประชาชน')}</span>
+          <span>ภูมิใจไทย</span><span class="n">${seatOf(seats66, 'ภูมิใจไทย')}</span><span class="n">${seatOf(seats69, 'ภูมิใจไทย')}</span>
+          <span>เพื่อไทย</span><span class="n">${seatOf(seats66, 'เพื่อไทย')}</span><span class="n">${seatOf(seats69, 'เพื่อไทย')}</span></div>
+          <div class="note">นับเฉพาะที่นั่งแบ่งเขต · จำนวนที่นั่งรวม ส.ส. บัญชีรายชื่อ (เช่น 151 ของก้าวไกลปี 66) ต้องใช้ตารางที่นั่งบัญชีรายชื่อเพิ่ม</div>`,
+        run: () => { paint({ fill: z => z.w69, ring: z => z.w66 && z.w66 !== z.w69 }); legend(top(seats69), 'สีปี 69 · กรอบดำ = เขตที่เปลี่ยนพรรคชนะจากปี 66'); },
+        enter66: true },
+      { id: 'list', no: 'ตอนที่ 3', title: 'แต่ถ้านับบัตรบัญชีรายชื่อ ภาพกลับต่างออกไป',
+        html: `<p>ให้แต่ละเขตสีตามพรรคที่ได้คะแนนบัญชีรายชื่อสูงสุดในเขตนั้น จะเห็นว่า <b class="hl">ประชาชนนำใน ${seatOf(listWins69, 'ประชาชน')} เขต</b> ทั้งที่ชนะแบ่งเขตเพียง ${seatOf(seats69, 'ประชาชน')} เขต</p>
+          <div class="kpis"><div class="kpi"><b style="color:${colorOf('ประชาชน')}">${seatOf(listWins69, 'ประชาชน')}</b><span>เขตที่ประชาชนนำบัญชีรายชื่อ</span></div>
+          <div class="kpi"><b style="color:${colorOf('ภูมิใจไทย')}">${seatOf(listWins69, 'ภูมิใจไทย')}</b><span>เขตที่ภูมิใจไทยนำบัญชีรายชื่อ</span></div></div>${bar(listWins69, N)}
+          <div class="note">ส่วนแบ่งบัญชีรายชื่อทั่วประเทศ: ประชาชน ${shareOf(list69, 'ประชาชน').toFixed(1)}% · ภูมิใจไทย ${shareOf(list69, 'ภูมิใจไทย').toFixed(1)}%</div>`,
+        run: () => { paint({ fill: z => z.l69 }); legend(top(listWins69), 'ผู้นำบัญชีรายชื่อรายเขต ปี 2569'); } },
+      { id: 'gap', no: 'ตอนที่ 4', title: 'ทำไมสองบัตรถึงให้ผลต่างกัน',
+        html: `<p>ใน <b class="hl">${diffZones.length} เขต</b> (${pct(diffZones.length, N, 0)}%) พรรคที่ชนะแบ่งเขต ไม่ใช่พรรคที่ได้บัญชีรายชื่อสูงสุดในเขตนั้น</p>
+          <p>แสดงว่าคนจำนวนมากเลือก <b>ตัวบุคคล</b> ในบัตรใบหนึ่ง และเลือก <b>พรรค</b> ในอีกใบ ดังนั้นการวิเคราะห์เขตควรให้น้ำหนักบัตรแบ่งเขตเป็นหลัก</p>
+          <div class="note">สีบนแผนที่ = พรรคที่ชนะแบ่งเขต · ช่องจาง = เขตที่ผลสองบัตรตรงกัน</div>`,
+        run: () => { const set = new Set(diffZones.map(z => z.key)); paint({ fill: z => z.w69, show: z => set.has(z.key) }); legend(top(count(diffZones, z => z.w69)), 'เขตที่ผู้ชนะแบ่งเขต ≠ ผู้นำบัญชีรายชื่อ'); } },
+      { id: 'bigfam', no: 'ตอนที่ 5', title: 'บ้านใหญ่: คนมากกว่าพรรค',
+        html: `<p>มี <b>${bf.length} เขต</b> ที่มีผู้สมัครจากตระกูลบ้านใหญ่ และ <b>${bf.filter(z => z.bigfamWin).length} เขต</b> ที่บ้านใหญ่ชนะ</p>
+          <p>ในเขตบ้านใหญ่ ผลสองบัตรต่างกัน <b class="hl">${pct(bfDiff, bf.length, 0)}%</b> ของเขต เทียบกับ <b>${pct(nbfDiff, nbf.length, 0)}%</b> ในเขตอื่น</p>
+          <div class="note">นิยามบ้านใหญ่ตามคอลัมน์ "บ้านใหญ่" ในไฟล์ผู้สมัครปี 69 (เขตที่มีผู้สมัครบ้านใหญ่อย่างน้อยหนึ่งคน)</div>`,
+        run: () => { paint({ fill: z => z.w69, show: z => z.bigfam }); legend(top(count(bf, z => z.w69)), 'เขตที่มีผู้สมัครบ้านใหญ่ (สีตามผู้ชนะ)'); } },
+      { id: 'switch', no: 'ตอนที่ 6', title: 'การดึงตัว: ใครย้ายไปไหน',
+        html: `<p>ผู้สมัครคนเดิมที่ <b>ย้ายพรรค</b> ระหว่างปี 66 ถึง 69 มี <b>${nSw} เขต</b> เส้นที่หนาที่สุดคือ <b class="hl">${sw1.f} → ${sw1.t}</b> (${sw1.n} เขต)</p>
+          <div class="note">นับเฉพาะผู้สมัครที่ลงเขตเดิมและเปลี่ยนสังกัด (ข้อมูลย้ายพรรคทั้งประเทศยังต้องการตารางเพิ่ม)</div>`,
+        run: () => { const set = new Set(zones.filter(z => z.switched).map(z => z.key)); paint({ fill: z => z.w69, show: z => set.has(z.key) }); legend(top(count(zones.filter(z => z.switched), z => z.w69)), 'เขตที่ผู้สมัครเดิมย้ายพรรค'); },
+        sankey: true },
+      { id: 'close', no: 'ตอนที่ 7', title: 'สูสี: ชนะกันไม่ถึง 5%',
+        html: `<p>ภาพรวมเกือบทุกเขต ${N - close.length} เขตชนะขาด แต่มี <b class="hl">${close.length} เขต</b> ที่ผู้ชนะนำที่สองไม่ถึง 5% ของคะแนนทั้งเขต</p>
+          <div class="sbar-leg">${count(close, z => z.w69).slice(0, 5).map(([p, n]) => `<span style="--c:${colorOf(p)}">${p} ${n}</span>`).join('')}</div>
+          <div class="note">เขตสูสี = ผู้ชนะแบ่งเขตอันดับ 1 นำอันดับ 2 น้อยกว่า 5% ของคะแนนรวมทั้งเขต</div>`,
+        run: () => { paint({ fill: z => z.w69, show: z => z.margin < 5 }); legend(top(count(close, z => z.w69)), 'เขตสูสี (สีตามผู้ชนะ)'); } },
+    ];
+
+    // ---- หน้าปกและหน้าสรุป ----
+    const cover = { cover: true, no: 'บทวิเคราะห์การเลือกตั้ง 2569', title: 'เลือกตั้ง 2569 เล่าผ่านแผนที่ 400 เขต',
+      html: `<p>ใครชนะ ชนะที่ไหน เพราะอะไร — กด "ถัดไป" เพื่อดูแผนที่เปลี่ยนไปทีละตอน แล้วค่อยไปสำรวจเขตของคุณเองในเครื่องมือเต็ม</p>
+        <p style="font-size:13px;opacity:.8">${S.length} ตอน · อ่านประมาณ 3 นาที</p><button class="btn" id="startbtn">เริ่มเลย →</button>`,
+      run: () => { paint({ fill: z => z.w69, show: () => false, faded: 0.5 }); legend([], 'แผนที่ 400 เขตเลือกตั้ง'); } };
+    const finale = { no: 'จบตอนที่ 7', title: 'อยากดูเขตของคุณเอง?',
+      html: `<p>เครื่องมือเต็มให้ค้นหาเขต กรองตามจังหวัด ภูมิภาค ระดับเศรษฐกิจ และดูแนวทางกลยุทธ์ของแต่ละพรรครายเขต</p>
+        <div class="soon">ฉบับร่างนี้เล่าถึงตอนที่ 7 จากทั้งหมด 16 ข้อ — ตอนต่อไป: กลยุทธ์พรรคส้ม พื้นที่เป้าหมาย GPP × ความเป็นเมือง ผู้ไม่มาใช้สิทธิ และธุรกิจของนักการเมือง</div>
+        <a class="btn" href="index.html">เปิดแผนที่สำรวจเต็ม →</a>`,
+      run: () => { paint({ fill: z => z.w69 }); legend(top(seats69), 'ผลแบ่งเขต ปี 2569'); } };
+    const deckSlides = [cover, ...S, finale];
+    const T = deckSlides.length;
+
+    const wrap = d3.select('#cardwrap'), dotsEl = d3.select('#dots');
+    dotsEl.selectAll('button').data(deckSlides).enter().append('button').attr('class', 'dot')
+      .attr('aria-label', (d, i) => `ไปหน้า ${i + 1}`).on('click', (e, d) => go(deckSlides.indexOf(d)));
+    let cur = -1, swapT = null;
+    function show(i) {
+      const sc = deckSlides[i];
+      wrap.html(`<div class="card${sc.cover ? ' cover' : ''}"><div class="no">${sc.cover ? sc.no : (sc.no === 'จบตอนที่ 7' ? sc.no : sc.no + ' / ' + S.length)}</div><h2>${sc.title}</h2>${sc.html}</div>`);
+      const sb = document.getElementById('startbtn'); if (sb) sb.onclick = () => go(1);
+      wrap.classed('out', false);
+    }
+    function go(i, fromHash) {
+      i = Math.max(0, Math.min(T - 1, i)); if (i === cur) return;
+      const first = cur < 0; cur = i;
+      const sc = deckSlides[i];
+      clearTimeout(swapT);
+      if (first) show(i); else { wrap.classed('out', true); swapT = setTimeout(() => show(i), 220); }
+      dotsEl.selectAll('.dot').classed('on', (_, k) => k === i);
+      d3.select('#prev').property('disabled', i === 0);
+      d3.select('#next').property('disabled', i === T - 1).style('visibility', i === T - 1 ? 'hidden' : 'visible');
+      d3.select('#prog').style('width', (i / (T - 1) * 100) + '%');
+      d3.select('#sankey').classed('show', !!sc.sankey);
+      d3.select('#map').style('opacity', sc.sankey ? 0.12 : 1);
+      if (sc.enter66) {
+        paint({ fill: z => z.w66 }); legend(top(seats66), 'ปี 2566 (ผู้ชนะแบ่งเขต)');
+        setTimeout(() => { if (cur === i) sc.run(); }, 1100);
+      } else sc.run();
+      if (!fromHash) { try { history.replaceState(null, '', i === 0 ? location.pathname : '#' + i); } catch (e) {} }
+    }
+    d3.select('#next').on('click', () => go(cur + 1));
+    d3.select('#prev').on('click', () => go(cur - 1));
+    addEventListener('keydown', e => {
+      if (e.target.closest && e.target.closest('a,input,select,textarea')) return;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+      else if (e.key === 'Home') go(0); else if (e.key === 'End') go(T - 1);
+    });
+    let tx = null, ty = null;
+    addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+    addEventListener('touchend', e => {
+      if (tx === null) return; const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(cur + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+    const fromHash = () => { const n = parseInt((location.hash || '').slice(1)); return isNaN(n) ? 0 : n; };
+    addEventListener('hashchange', () => go(fromHash(), true));
+    go(fromHash(), true);
+    window.__go = go;
+    window.__story = { N, seats69, seats66, listWins69, diffZones: diffZones.length, bf: bf.length, bfDiff, nbfDiff, close: close.length, changed: changed.length, nSw, links };
+  });
+</script>
+</body></html>
