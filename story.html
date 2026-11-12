@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เลือกตั้ง 2569 — เล่าผ่านแผนที่</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root { --bg:#f7f4ee; --ink:#222; --slate:#2D3748; --muted:#64748b; --card:#fff; --line:#e2e8f0; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { font-family:'Kanit',sans-serif; background:var(--bg); color:var(--ink); margin:0; overflow:hidden; }
+  a { color:inherit; }
+  .topbar { position:fixed; top:0; left:0; right:0; z-index:20; height:4px; }
+  .topbar i { display:block; height:100%; width:0; background:var(--slate); transition:width .4s; }
+
+  .deck { display:flex; height:100vh; height:100dvh; max-width:1180px; margin:0 auto; padding:0 20px; gap:24px; }
+  .panel { flex:0 0 min(440px,42%); display:flex; flex-direction:column; justify-content:center; gap:14px; min-width:0; }
+  .cardwrap { transition:opacity .25s, transform .25s; }
+  .cardwrap.out { opacity:0; transform:translateY(8px); }
+  .topic { background:var(--slate); color:#fff; font-weight:600; font-size:14px; padding:9px 14px; border-radius:8px 8px 0 0; letter-spacing:.01em; }
+  .topic + .card { border-radius:0 0 10px 10px; }
+  .topic + .card.cover { border-top:1px solid #4a5568; }
+  .card { background:var(--card); border-radius:10px; padding:18px 18px 16px; box-shadow:0 2px 8px rgba(0,0,0,.08); border-left:4px solid var(--slate); }
+  .card .no { font-size:12px; font-weight:600; color:var(--muted); }
+  .card h2 { font-size:21px; line-height:1.3; margin:2px 0 8px; color:var(--slate); font-weight:600; }
+  .card p { font-size:15px; line-height:1.7; color:#334155; margin:0 0 8px; }
+  .card b.hl { color:#b91c1c; }
+  .card .note { font-size:12px; color:var(--muted); line-height:1.55; margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1; }
+  .card.cover { border-left:none; background:var(--slate); color:#fff; padding:26px 24px; }
+  .card.cover .no { color:#cbd5e1; letter-spacing:.06em; }
+  .card.cover h2 { color:#fff; font-size:clamp(26px,3.4vw,36px); line-height:1.2; margin:6px 0 12px; }
+  .card.cover p { color:#e2e8f0; }
+  .btn { display:inline-block; background:var(--slate); color:#fff; text-decoration:none; padding:9px 20px; border-radius:6px; font-size:14px; font-weight:600; border:0; cursor:pointer; font-family:inherit; }
+  .card.cover .btn { background:#fff; color:var(--slate); margin-top:6px; }
+  .soon { background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 12px; margin:10px 0; font-size:12.5px; color:#64748b; line-height:1.6; }
+  .kpis { display:flex; gap:10px; margin:10px 0 4px; flex-wrap:wrap; }
+  .kpi { flex:1 1 90px; background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .kpi b { display:block; font-size:24px; line-height:1.1; }
+  .kpi span { font-size:11px; color:var(--muted); }
+  .sbar { display:flex; height:18px; border-radius:4px; overflow:hidden; margin:8px 0 4px; background:#e2e8f0; }
+  .sbar i { display:block; height:100%; }
+  .sbar-leg { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; color:#475569; }
+  .sbar-leg span::before { content:''; display:inline-block; width:9px; height:9px; border-radius:2px; background:var(--c); margin-right:4px; }
+  .cmp { display:grid; grid-template-columns:auto 1fr 1fr; gap:4px 12px; font-size:13px; margin:8px 0; align-items:center; }
+  .cmp .h { font-size:11px; color:var(--muted); font-weight:600; }
+  .cmp .n { font-weight:600; }
+
+  .nav { display:flex; align-items:center; gap:10px; }
+  .nav button { font-family:inherit; font-size:14px; font-weight:600; border:0; border-radius:6px; padding:9px 16px; cursor:pointer; background:var(--slate); color:#fff; }
+  .nav button.ghost { background:#fff; color:var(--slate); border:1px solid #cbd5e1; }
+  .nav button:disabled { opacity:.35; cursor:default; }
+  .nav button:focus-visible { outline:3px solid #93c5fd; outline-offset:2px; }
+  .nav .grow { flex:1; display:flex; justify-content:center; gap:7px; flex-wrap:wrap; }
+  .nav button.dot { width:10px; height:10px; min-width:10px; border-radius:50%; background:#cbd5e1; border:0; padding:0; cursor:pointer; }
+  .nav button.dot.on { background:var(--slate); transform:scale(1.3); }
+  .hintkeys { font-size:11px; color:var(--muted); text-align:center; }
+
+  .stage { flex:1 1 auto; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 0; min-width:0; }
+  .stage-in { position:relative; height:calc(100vh - 150px); height:calc(100dvh - 150px); aspect-ratio:940/1420; max-width:100%; }
+  .zone rect { stroke:#fff; stroke-width:1; }
+  .won-mark { fill:#fff; stroke:#111; stroke-width:1; stroke-linejoin:round; }
+  .zone.ring rect { stroke:#111; stroke-width:2.2; }
+  .prov-label { font-size:10.5px; fill:#475569; font-weight:500; pointer-events:none; }
+  .legend { margin-top:10px; background:#fff; border-radius:10px; padding:8px 14px; box-shadow:0 2px 8px rgba(0,0,0,.08); font-size:12px; display:flex; flex-wrap:wrap; gap:4px 14px; justify-content:center; min-height:34px; max-width:100%; }
+  .legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:2px; background:var(--c); margin-right:5px; vertical-align:-1px; }
+  .legend .cap { color:var(--muted); width:100%; text-align:center; font-size:11px; }
+
+
+  .stage-in { position:relative; width:100%; height:calc(100vh - 150px); height:calc(100dvh - 150px); aspect-ratio:auto; max-width:none; }
+  .layer { position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .4s; }
+  .layer.show { opacity:1; pointer-events:auto; }
+  #mapS { width:100%; height:100%; }
+  #mapD { display:flex; gap:8px; justify-content:center; }
+  .dm { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; }
+  .dm h4 { margin:0 0 4px; font-size:13px; color:#fff; background:var(--slate); border-radius:6px; padding:4px 10px; width:100%; text-align:center; font-weight:600; }
+  .dm svg { width:100%; flex:1 1 auto; min-height:0; }
+  .dm .vb { width:100%; margin-top:4px; }
+  .dm .vb .sbar { height:12px; margin:2px 0; }
+  .dm .vb .sbar-leg { font-size:10.5px; gap:2px 8px; }
+  #panel { display:flex; flex-direction:column; background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:14px; overflow:auto; }
+  #panel h3 { margin:0 0 8px; font-size:15px; color:var(--slate); }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .tabs button { font-family:inherit; font-size:13px; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:var(--slate); cursor:pointer; }
+  .tabs.vt { margin-bottom:6px; } .tabs.vt button { padding:3px 14px; }
+  .sc-leg { font-size:12px; color:#475569; margin:4px 0 8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; } .sc-leg span { width:14px; height:10px; border-radius:2px; background:#64748b; } .sc-leg .o { opacity:.35; } .sc-leg em { margin-left:auto; font-style:normal; color:#94a3b8; }
+  .sc { display:flex; flex-direction:column; gap:7px; } .scr { display:grid; grid-template-columns:130px 1fr 44px; align-items:center; gap:8px; font-size:13px; }
+  .scn { display:flex; align-items:center; gap:2px; line-height:1.25; } .scb { display:flex; flex-direction:column; gap:2px; } .bar { height:14px; min-width:2px; border-radius:0 3px 3px 0; position:relative; transition:width .5s; } .bar i { position:absolute; left:calc(100% + 4px); top:-1px; font-style:normal; font-size:11px; color:#334155; font-weight:600; }
+  .scd { text-align:right; font-weight:700; color:#94a3b8; } .scd.up { color:#15803d; } .scd.dn { color:#b91c1c; }
+  .tabs button.on { background:var(--slate); color:#fff; border-color:var(--slate); }
+  table.st { width:100%; border-collapse:collapse; font-size:13px; }
+  table.st th { text-align:right; font-weight:600; color:var(--muted); font-size:11.5px; padding:5px 8px; border-bottom:2px solid var(--line); }
+  table.st th:first-child, table.st td:first-child { text-align:left; }
+  table.st td { padding:6px 8px; border-bottom:1px solid #eef2f7; text-align:right; font-variant-numeric:tabular-nums; }
+  table.st td.em, table.st th.em { background:#f1f5f9; font-weight:700; color:#111; }
+  table.st .dot { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+  table.st tr.gr th { text-align:center; border-bottom:none; color:var(--slate); font-size:12.5px; }
+  .ctl { margin-top:6px; display:flex; gap:6px 10px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .ctl button { font-family:inherit; font-size:12px; padding:4px 10px; border-radius:14px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; color:var(--slate); }
+  .ctl button.on { background:var(--slate); color:#fff; border-color:var(--slate); }
+  .parl { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .parl > div { flex:1 1 140px; text-align:center; }
+  .parl svg { width:100%; }
+  .parl h4 { margin:0; color:var(--slate); font-size:14px; }
+  .sk-node { cursor:pointer; }
+  .scat text { font-family:inherit; }
+  .mini { width:100%; font-size:12px; border-collapse:collapse; margin-top:8px; }
+  .mini td, .mini th { padding:3px 4px; border-bottom:1px solid #eef2f7; text-align:left; }
+  .mini th { color:var(--muted); font-weight:600; font-size:11px; }
+  .ratio { display:flex; height:26px; border-radius:5px; overflow:hidden; margin:8px 0 4px; font-size:12px; color:#fff; font-weight:600; }
+  .ratio span { display:flex; align-items:center; justify-content:center; }
+  .src { font-size:11px; color:var(--muted); margin-top:6px; }
+
+  @media (max-width:820px){
+    .deck { flex-direction:column; padding:0 12px; gap:0; }
+    .stage { order:1; flex:0 0 auto; height:44vh; height:44dvh; padding:6px 0 0; }
+    .stage-in { height:calc(44dvh - 50px); }
+    #panel { padding:8px; } table.st { font-size:11.5px; }
+    .legend { margin-top:4px; padding:4px 10px; font-size:11px; }
+    .panel { order:2; flex:1 1 auto; justify-content:flex-start; padding:8px 0 10px; min-height:0; }
+    .cardwrap { overflow-y:auto; min-height:0; flex:1 1 auto; }
+    .card h2 { font-size:18px; } .card p { font-size:14px; line-height:1.6; }
+    .hintkeys { display:none; }
+  }
+</style></head>
+<body>
+<div class="topbar"><i id="prog"></i></div>
+<div class="deck">
+  <div class="panel">
+    <div class="cardwrap" id="cardwrap" aria-live="polite"></div>
+    <div class="nav">
+      <button class="ghost" id="prev" aria-label="ย้อนกลับ">← ย้อนกลับ</button>
+      <div class="grow" id="dots"></div>
+      <button id="next" aria-label="ถัดไป">ถัดไป →</button>
+    </div>
+    <div class="hintkeys">กด ← → บนคีย์บอร์ด หรือปัดซ้าย-ขวาเพื่อเปลี่ยนตอน</div>
+  </div>
+  <div class="stage">
+    <div class="stage-in" id="stagein">
+      <div class="layer show" id="mapS"><svg viewBox="100 20 940 1420" style="width:100%;height:100%" role="img" aria-label="แผนที่ 400 เขตเลือกตั้ง"></svg></div>
+      <div class="layer" id="mapD">
+        <div class="dm"><h4 id="dmLt">บัญชีรายชื่อ</h4><svg viewBox="100 20 940 1420"></svg><div class="vb" id="vbL"></div></div>
+        <div class="dm"><h4 id="dmRt">แบ่งเขต</h4><svg viewBox="100 20 940 1420"></svg><div class="vb" id="vbR"></div></div>
+      </div>
+      <div class="layer" id="panel"></div>
+    </div>
+    <div class="ctl" id="ctl"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<script>
+  const partyColors = {
+    'ภูมิใจไทย': '#322485',
+    'ประชาชน': '#FF6411',
+    'ก้าวไกล': '#F77831',
+    'เพื่อไทย': '#D60003',
+    'กล้าธรรม': '#48CB74',
+    'ประชาธิปัตย์': '#01A4E4',
+    'รวมไทยสร้างชาติ': '#272D80',
+    'พลังประชารัฐ': '#086A3B',
+    'ไทรวมพลัง': '#FD318C',
+    'เพื่อไทรวมพลัง': '#FD318C',
+    'ประชาชาติ': '#A46D06',
+    'ไทยสร้างไทย': '#5A0F9D',
+    'ชาติไทยพัฒนา': '#E71485',
+    'เสรีรวมไทย': '#D8B720',
+    'โอกาสใหม่': '#F1666B',
+    // สีตามแม่แบบ "สีประจำพรรคการเมืองไทย" (th.wikipedia.org)
+    'ไทยก้าวใหม่': '#F7EB00',
+    'ประชาธิปไตยใหม่': '#FA5816',
+    'ประชากรไทย': '#00CED1',
+    'ไทยภักดี': '#00C13A',
+    'เศรษฐกิจ': '#FFBE3E',
+  };
+  const regionMap = {
+    'เชียงราย': 'เหนือ', 'น่าน': 'เหนือ', 'พะเยา': 'เหนือ', 'เชียงใหม่': 'เหนือ', 'แม่ฮ่องสอน': 'เหนือ', 'แพร่': 'เหนือ', 'ลำปาง': 'เหนือ', 'ลำพูน': 'เหนือ', 'อุตรดิตถ์': 'เหนือ',
+    'กรุงเทพมหานคร': 'กลาง', 'พิษณุโลก': 'กลาง', 'สุโขทัย': 'กลาง', 'เพชรบูรณ์': 'กลาง', 'พิจิตร': 'กลาง', 'กำแพงเพชร': 'กลาง', 'นครสวรรค์': 'กลาง', 'ลพบุรี': 'กลาง', 'ชัยนาท': 'กลาง', 'อุทัยธานี': 'กลาง', 'สิงห์บุรี': 'กลาง', 'อ่างทอง': 'กลาง', 'สระบุรี': 'กลาง', 'พระนครศรีอยุธยา': 'กลาง', 'สุพรรณบุรี': 'กลาง', 'นครนายก': 'กลาง', 'นนทบุรี': 'กลาง', 'ปทุมธานี': 'กลาง', 'นครปฐม': 'กลาง', 'สมุทรปราการ': 'กลาง', 'สมุทรสาคร': 'กลาง', 'สมุทรสงคราม': 'กลาง', 'กานต์จนบุรี': 'กลาง',
+    'หนองคาย': 'อีสาน', 'นครพนม': 'อีสาน', 'สกลนคร': 'อีสาน', 'อุดรธานี': 'อีสาน', 'หนองบัวลำภู': 'อีสาน', 'เลย': 'อีสาน', 'มุกดาหาร': 'อีสาน', 'กาฬสินธุ์': 'อีสาน', 'ขอนแก่น': 'อีสาน', 'อำนาจเจริญ': 'อีสาน', 'ยโสธร': 'อีสาน', 'ร้อยเอ็ด': 'อีสาน', 'มหาสารคาม': 'อีสาน', 'ชัยภูมิ': 'อีสาน', 'นครราชสีมา': 'อีสาน', 'บุรีรัมย์': 'อีสาน', 'สุรินทร์': 'อีสาน', 'ศรีสะเกษ': 'อีสาน', 'อุบลราชธานี': 'อีสาน', 'บึงกาฬ': 'อีสาน',
+    'สระแก้ว': 'ตะวันออก', 'ปราจีนบุรี': 'ตะวันออก', 'ฉะเชิงเทรา': 'ตะวันออก', 'ชลบุรี': 'ตะวันออก', 'ระยอง': 'ตะวันออก', 'จันทบุรี': 'ตะวันออก', 'ตราด': 'ตะวันออก',
+    'ตาก': 'ตะวันตก', 'กาญจนบุรี': 'ตะวันตก', 'ราชบุรี': 'ตะวันตก', 'เพชรบุรี': 'ตะวันตก', 'ประจวบคีรีขันธ์': 'ตะวันตก',
+    'ชุมพร': 'ใต้', 'ระนอง': 'ใต้', 'สุราษฎร์ธานี': 'ใต้', 'นครศรีธรรมราช': 'ใต้', 'กระบี่': 'ใต้', 'พังงา': 'ใต้', 'ภูเก็ต': 'ใต้', 'พัทลุง': 'ใต้', 'ตรัง': 'ใต้', 'ปัตตานี': 'ใต้', 'สงขลา': 'ใต้', 'สตูล': 'ใต้', 'นราธิวาส': 'ใต้', 'ยะลา': 'ใต้'
+  };
+
+  // 3. เลย์เอาต์ตำแหน่งเขตเลือกตั้ง
+  const L = {
+    'เชียงราย':  { o:[355,65],  rows:[[0,3],[-22,3],[-22,1]], label:[362,43,'m'] },
+    'เชียงใหม่': { o:[231,106], rows:[[0,3],[0,3],[0,2],[0,1],[0,1]], label:[239,84,'m'] },
+    'แม่ฮ่องสอน':{ o:[185,170], rows:[[0,1],[0,1]], label:[175,148,'m'] },
+    'ลำพูน':     { o:[285,195], rows:[[0,1],[0,1]], label:[285,170,'m'] },
+    'ลำปาง':     { o:[339,163], rows:[[0,2],[0,2]], label:[338,141,'m'] },
+    'พะเยา':     { o:[398,127], rows:[[0,3]], label:[408,105,'m'] },
+    'แพร่':      { o:[406,176], rows:[[0,1],[0,1],[0,1]], label:[406,157,'m'] },
+    'น่าน':      { o:[511,130], rows:[[0,1],[-10,1],[-22,1]], label:[483,130,'m'] },
+    'อุตรดิตถ์': { o:[533,198], rows:[[0,1],[-22,2]], label:[462,219,'m'] },
+    'ตาก':       { o:[204,257], rows:[[0,1],[14,1],[28,1]], label:[201,237,'m'] },
+    'สุโขทัย':   { o:[322,236], rows:[[0,2],[0,2]], label:[333,214,'m'] },
+    'พิษณุโลก':  { o:[405,271], rows:[[0,3],[0,2]], label:[422,250,'m'] },
+    'พิจิตร':    { o:[335,316], rows:[[0,3]], label:[360,295,'m'] },
+    'กำแพงเพชร': { o:[276,311], rows:[[0,2],[0,2]], label:[286,288,'m'] },
+    'อุทัยธานี': { o:[264,370], rows:[[0,1],[11,1]], label:[224,368,'m'] },
+    'นครสวรรค์': { o:[333,370], rows:[[0,4],[44,2]], label:[352,347,'m'] },
+    'เพชรบูรณ์': { o:[450,358], rows:[[0,2],[0,2],[0,2]], label:[469,336,'m'] },
+
+    'เลย':        { o:[485,259], rows:[[0,1],[0,1],[0,2]], label:[511,275,'m'] },
+    'หนองคาย':    { o:[593,196], pts:[[0,0],[22,12],[44,0]], label:[613,173,'m'] },
+    'บึงกาฬ':     { o:[681,190], rows:[[0,3]], label:[693,168,'m'] },
+    'หนองบัวลำภู':{ o:[545,323], rows:[[0,3]], label:[568,300,'m'] },
+    'อุดรธานี':   { o:[619,257], rows:[[0,5],[0,5]], label:[627,236,'m'] },
+    'สกลนคร':     { o:[759,228], rows:[[0,2],[0,2],[0,2],[0,1]], label:[769,205,'m'] },
+    'นครพนม':     { o:[814,239], pts:[[0,0],[11,22],[21,44],[11,65]], label:[829,238,'s'] },
+    'กาฬสินธุ์':  { o:[720,348], rows:[[0,3],[0,3]], label:[726,323,'m'] },
+    'มุกดาหาร':   { o:[831,340], pts:[[0,0],[0,24]], label:[846,336,'s'] },
+    'อำนาจเจริญ': { o:[866,389], pts:[[0,0],[20,22]], label:[885,386,'s'] },
+    'ชัยภูมิ':    { o:[531,385], rows:[[0,2],[0,2],[0,3]], label:[531,363,'m'] },
+    'ขอนแก่น':    { o:[611,370], rows:[[0,3],[22,2],[22,2],[22,2],[22,2]], label:[627,347,'m'] },
+    'มหาสารคาม':  { o:[721,435], rows:[[0,2],[0,2],[0,2]], label:[732,413,'m'] },
+    'ร้อยเอ็ด':   { o:[785,424], rows:[[0,2],[0,2],[0,2],[0,2]], label:[797,401,'m'] },
+    'ยโสธร':      { o:[859,454], rows:[[0,1],[0,1],[0,1]], label:[857,432,'m'] },
+    'อุบลราชธานี':{ o:[918,452], rows:[[0,1],[0,2],[0,2],[0,2],[0,2],[0,2]], label:[935,452,'s'] },
+    'นครราชสีมา': { o:[511,498], rows:[[0,6],[0,6],[0,4]], label:[537,476,'m'] },
+    'บุรีรัมย์':  { o:[679,532], rows:[[0,2],[0,2],[0,2],[0,2],[0,2]], label:[680,511,'m'] },
+    'สุรินทร์':   { o:[766,561], rows:[[0,2],[-22,3],[-22,3]], label:[743,540,'m'] },
+    'ศรีสะเกษ':   { o:[833,562], rows:[[0,3],[0,3],[0,3]], label:[856,540,'m'] },
+
+    'ชัยนาท':    { o:[287,427], rows:[[0,2]], label:[248,425,'m'] },
+    'สิงห์บุรี':  { o:[396,430], rows:[[0,1]], label:[360,429,'m'] },
+    'ลพบุรี':    { o:[482,430], rows:[[0,1],[-44,3]], label:[452,428,'m'] },
+    'อ่างทอง':   { o:[376,469], rows:[[0,2]], label:[339,470,'m'] },
+    'สระบุรี':   { o:[438,513], rows:[[0,2],[0,2]], label:[462,491,'m'] },
+    'พระนครศรีอยุธยา': { o:[354,525], rows:[[0,3],[22,2]], label:[367,503,'m'], text:'อยุธยา' },
+    'สุพรรณบุรี':{ o:[271,474], rows:[[0,2],[0,2],[22,1]], label:[227,474,'m'] },
+    'กาญจนบุรี': { o:[240,559], rows:[[0,1],[11,1],[22,1],[32,1],[43,1]], label:[234,535,'m'] },
+    'นครปฐม':    { o:[322,588], rows:[[0,2],[0,2],[0,2]], label:[334,567,'m'] },
+    'ปทุมธานี':  { o:[404,582], rows:[[0,4],[0,4]], label:[455,559,'m'] },
+    'นนทบุรี':   { o:[420,657], rows:[[0,4],[0,4]], label:[430,635,'m'] },
+    'สมุทรสาคร': { o:[359,661], rows:[[0,2],[0,2]], label:[310,680,'m'] },
+    'สมุทรสงคราม':{ o:[359,715], rows:[[0,1]], label:[300,714,'m'] },
+    'สมุทรปราการ':{ o:[394,717], rows:[[0,5],[44,3]], label:[452,761,'m'] },
+    'ราชบุรี':   { o:[337,751], rows:[[0,2],[0,3]], label:[298,748,'m'] },
+    'เพชรบุรี':  { o:[343,805], rows:[[0,1],[0,2]], label:[305,802,'m'] },
+    'ประจวบคีรีขันธ์': { o:[341,866], rows:[[0,1],[-16,1],[-28,1]], label:[280,861,'m'] },
+    'กรุงเทพมหานคร': { o:[465,902], rows:[[0,8],[0,9],[0,9],[44,7]], label:[501,882,'m'] },
+
+    'นครนายก':   { o:[522,630], rows:[[0,2]], label:[535,610,'m'] },
+    'ปราจีนบุรี':{ o:[613,598], rows:[[0,1],[0,1],[0,1]], label:[613,575,'m'] },
+    'สระแก้ว':   { o:[703,663], rows:[[0,2],[0,1]], label:[718,685,'s'] },
+    'ฉะเชิงเทรา':{ o:[595,698], rows:[[0,4]], label:[615,677,'m'] },
+    'ชลบุรี':    { o:[524,701], rows:[[0,2],[0,3],[0,3],[0,1],[0,1]], label:[523,809,'m'] },
+    'ระยอง':     { o:[571,785], rows:[[0,3],[22,2]], label:[594,766,'m'] },
+    'จันทบุรี':  { o:[643,740], rows:[[0,1],[0,2]], label:[657,740,'s'] },
+    'ตราด':      { o:[672,816], rows:[[0,1]], label:[672,834,'m'] },
+
+    'ชุมพร':          { o:[310,944],  rows:[[0,1],[-13,1],[-22,1]], label:[272,943,'m'] },
+    'ระนอง':          { o:[254,1009], rows:[[0,1]], label:[218,1006,'m'] },
+    'สุราษฎร์ธานี':   { o:[289,1021], rows:[[0,2],[0,2],[0,2],[22,1]], label:[331,1018,'s'] },
+    'พังงา':          { o:[256,1055], rows:[[0,1],[0,1]], label:[224,1053,'m'] },
+    'นครศรีธรรมราช':  { o:[373,1063], rows:[[0,1],[0,1],[0,2],[0,2],[-22,3]], label:[388,1079,'s'] },
+    'กระบี่':         { o:[276,1135], rows:[[0,2],[0,1]], label:[276,1114,'m'] },
+    'ภูเก็ต':         { o:[237,1157], rows:[[0,1],[0,1],[0,1]], label:[206,1157,'m'] },
+    'ตรัง':           { o:[303,1205], rows:[[0,2],[0,2]], label:[274,1202,'m'] },
+    'พัทลุง':         { o:[365,1193], rows:[[0,1],[0,2]], label:[379,1193,'s'] },
+    'สตูล':           { o:[325,1265], rows:[[0,1],[0,1]], label:[295,1258,'m'] },
+    'สงขลา':          { o:[367,1253], rows:[[0,3],[0,3],[0,3]], label:[372,1327,'m'] },
+    'ปัตตานี':        { o:[460,1272], rows:[[0,2],[0,3]], label:[470,1250,'m'] },
+    'ยะลา':           { o:[460,1329], rows:[[0,2],[22,1]], label:[449,1350,'m'] },
+    'นราธิวาส':       { o:[525,1351], rows:[[0,2],[0,3]], label:[541,1396,'m'] }
+  };
+
+  // แมประดับ GPP สำรองตามชื่อจังหวัด ( fallback ในกรณีที่ไม่มีคอลัมน์ใน CSV )
+  const defaultGppMap = {
+    'ระยอง': 'สูงมาก', 'ชลบุรี': 'สูงมาก', 'ฉะเชิงเทรา': 'สูงมาก', 'กรุงเทพมหานคร': 'สูงมาก', 'สมุทรสาคร': 'สูงมาก', 'ภูเก็ต': 'สูงมาก', 'ปราจีนบุรี': 'สูงมาก', 'สระบุรี': 'สูงมาก', 'พระนครศรีอยุธยา': 'สูงมาก', 'ปทุมธานี': 'สูงมาก',
+    'นนทบุรี': 'สูง', 'นครปฐม': 'สูง', 'สมุทรปราการ': 'สูง', 'เพชรบุรี': 'สูง', 'ประจวบคีรีขันธ์': 'สูง', 'สุราษฎร์ธานี': 'สูง', 'กระบี่': 'สูง', 'พังงา': 'สูง', 'สงขลา': 'สูง', 'ขอนแก่น': 'สูง', 'นครราชสีมา': 'สูง', 'เชียงใหม่': 'สูง', 'ลำพูน': 'สูง', 'ราชบุรี': 'สูง', 'ตราด': 'สูง', 'จันทบุรี': 'สูง', 'ชุมพร': 'สูง', 'ระนอง': 'สูง',
+    'เชียงราย': 'ปานกลาง', 'พิษณุโลก': 'ปานกลาง', 'นครสวรรค์': 'ปานกลาง', 'สุพรรณบุรี': 'ปานกลาง', 'กาญจนบุรี': 'ปานกลาง', 'กานต์จนบุรี': 'ปานกลาง', 'ลพบุรี': 'ปานกลาง', 'สระแก้ว': 'ปานกลาง', 'อุดรธานี': 'ปานกลาง', 'อุบลราชธานี': 'ปานกลาง', 'ตรัง': 'ปานกลาง', 'พัทลุง': 'ปานกลาง', 'สตูล': 'ปานกลาง', 'ตาก': 'ปานกลาง', 'เพชรบูรณ์': 'ปานกลาง', 'กำแพงเพชร': 'ปานกลาง', 'พิจิตร': 'ปานกลาง', 'สุโขทัย': 'ปานกลาง', 'อุตรดิตถ์': 'ปานกลาง', 'ลำปาง': 'ปานกลาง', 'แพร่': 'ปานกลาง', 'พะเยา': 'ปานกลาง', 'น่าน': 'ปานกลาง', 'ชัยนาท': 'ปานกลาง', 'อ่างทอง': 'ปานกลาง', 'สิงห์บุรี': 'ปานกลาง', 'สมุทรสงคราม': 'ปานกลาง', 'นครนายก': 'ปานกลาง',
+    'แม่ฮ่องสอน': 'ต่ำ', 'อุทัยธานี': 'ต่ำ', 'เลย': 'ต่ำ', 'หนองคาย': 'ต่ำ', 'บึงกาฬ': 'ต่ำ', 'หนองบัวลำภู': 'ต่ำ', 'สกลนคร': 'ต่ำ', 'นครพนม': 'ต่ำ', 'กาฬสินธุ์': 'ต่ำ', 'มุกดาหาร': 'ต่ำ', 'ชัยภูมิ': 'ต่ำ', 'มหาสารคาม': 'ต่ำ', 'ร้อยเอ็ด': 'ต่ำ', 'ยโสธร': 'ต่ำ', 'อำนาจเจริญ': 'ต่ำ', 'บุรีรัมย์': 'ต่ำ', 'สุรินทร์': 'ต่ำ', 'ศรีสะเกษ': 'ต่ำ', 'นครศรีธรรมราช': 'ต่ำ', 'ปัตตานี': 'ต่ำ', 'ยะลา': 'ต่ำ', 'นราธิวาส': 'ต่ำ'
+  };
+
+  // รายชื่อ 'คนเดิมย้ายพรรค' จากไฟล์ สส66_ย้ายพรรค69.csv (68 เขต)
+  const SWITCHED_MAP = {
+    "กาฬสินธุ์_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "กาฬสินธุ์", "นายจำลอง  ภูนวนทา"],
+    "กำแพงเพชร_1": ["พลังประชารัฐ", "กล้าธรรม", 1, "กำแพงเพชร", "นายไผ่  ลิกค์"],
+    "กำแพงเพชร_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "กำแพงเพชร", "นายเพชรภูมิ  อาภรณ์รัตน์"],
+    "ฉะเชิงเทรา_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "ฉะเชิงเทรา", "นายอรรถกร  ศิริลัทธยากร"],
+    "ชัยภูมิ_7": ["พลังประชารัฐ", "กล้าธรรม", 7, "ชัยภูมิ", "นายอัครแสนคีรี  โล่ห์วีระ"],
+    "ตาก_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "ตาก", "นายภาคภูมิ  บูลย์ประมุข"],
+    "นครปฐม_2": ["รวมไทยสร้างชาติ", "กล้าธรรม", 2, "นครปฐม", "พันโทสินธพ  แก้วพิจิตร"],
+    "นครสวรรค์_3": ["รวมไทยสร้างชาติ", "กล้าธรรม", 3, "นครสวรรค์", "นายสัญญา  นิลสุพรรณ"],
+    "นราธิวาส_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "นราธิวาส", "นายอามินทร์  มะยูโซ๊ะ"],
+    "นราธิวาส_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "นราธิวาส", "นายสัมพันธ์  มะยูโซ๊ะ"],
+    "ประจวบคีรีขันธ์_2": ["ประชาธิปัตย์", "กล้าธรรม", 2, "ประจวบคีรีขันธ์", "นายจักพันธ์  ปิยพรไพบูลย์"],
+    "ปัตตานี_4": ["ประชาธิปัตย์", "กล้าธรรม", 4, "ปัตตานี", "นายยูนัยดี  วาบา"],
+    "พะเยา_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "พะเยา", "นายอนุรัตน์  ตันบรรจง"],
+    "พะเยา_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "พะเยา", "นายจีรเดช  ศรีวิราช"],
+    "ราชบุรี_2": ["พลังประชารัฐ", "กล้าธรรม", 2, "ราชบุรี", "นางบุญยิ่ง  นิติกาญจนา"],
+    "ราชบุรี_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "ราชบุรี", "นายจตุพร  กมลพันธ์ทิพย์"],
+    "ร้อยเอ็ด_3": ["พลังประชารัฐ", "กล้าธรรม", 3, "ร้อยเอ็ด", "นางรัชนี  พลซื่อ"],
+    "สกลนคร_2": ["ประชาธิปัตย์", "กล้าธรรม", 2, "สกลนคร", "นายชาตรี  หล้าพรหม"],
+    "สงขลา_4": ["พลังประชารัฐ", "กล้าธรรม", 4, "สงขลา", "นายชนนพัฒฐ์  นาคสั้ว"],
+    "สงขลา_8": ["ประชาธิปัตย์", "กล้าธรรม", 8, "สงขลา", "พลตำรวจตรีสุรินทร์  ปาลาเร่"],
+    "สระบุรี_4": ["พลังประชารัฐ", "กล้าธรรม", 4, "สระบุรี", "นายองอาจ  วงษ์ประยูร"],
+    "สุราษฎร์ธานี_5": ["รวมไทยสร้างชาติ", "กล้าธรรม", 5, "สุราษฎร์ธานี", "นายปรเมษฐ์  จินา"],
+    "เชียงใหม่_9": ["พลังประชารัฐ", "กล้าธรรม", 9, "เชียงใหม่", "นายนเรศ  ธำรงค์ทิพยคุณ"],
+    "แม่ฮ่องสอน_1": ["พลังประชารัฐ", "กล้าธรรม", 1, "แม่ฮ่องสอน", "นายปกรณ์  จีนาคำ"],
+    "ชลบุรี_4": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 4, "ชลบุรี", "นายจิรวุฒิ  สิงห์โตทอง"],
+    "ชลบุรี_5": ["เพื่อไทย", "ภูมิใจไทย", 5, "ชลบุรี", "นายอนันต์  ปรีดาสุทธิจิตต์"],
+    "ชุมพร_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "ชุมพร", "นายวิชัย  สุดสวาสดิ์"],
+    "ชุมพร_3": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 3, "ชุมพร", "นายสุพล  จุลใส"],
+    "ตรัง_2": ["พลังประชารัฐ", "ภูมิใจไทย", 2, "ตรัง", "นายทวี  สุระบาล"],
+    "นครนายก_2": ["เพื่อไทย", "ภูมิใจไทย", 2, "นครนายก", "นายเกรียงไกร  กิตติธเนศวร"],
+    "นครปฐม_1": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 1, "นครปฐม", "นายศุภโชค  ศรีสุขจร"],
+    "นครปฐม_3": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 3, "นครปฐม", "นายพาณุวัฒณ์  สะสมทรัพย์"],
+    "นครปฐม_5": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 5, "นครปฐม", "นายอนุชา  สะสมทรัพย์"],
+    "นครศรีธรรมราช_8": ["ประชาธิปัตย์", "ภูมิใจไทย", 9, "นครศรีธรรมราช", "นางอวยพรศรี  เชาวลิต"],
+    "นครศรีธรรมราช_9": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 10, "นครศรีธรรมราช", "นางสาวพิมพ์ภัทรา  วิชัยกุล"],
+    "นครสวรรค์_6": ["ชาติพัฒนากล้า", "ภูมิใจไทย", 6, "นครสวรรค์", "นายประสาท  ตันประเสริฐ"],
+    "ปัตตานี_2": ["พลังประชารัฐ", "ภูมิใจไทย", 2, "ปัตตานี", "นายคอซีย์  มามุ"],
+    "ปัตตานี_5": ["ประชาชาติ", "ภูมิใจไทย", 5, "ปัตตานี", "นายสาเหะมูหามัด  อัลอิดรุส"],
+    "พังงา_2": ["พลังประชารัฐ", "ภูมิใจไทย", 2, "พังงา", "นายฉกาจ  พัฒนกิจวิบูลย์"],
+    "พิษณุโลก_3": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 3, "พิษณุโลก", "นายพงษ์มนู  ทองหนัก"],
+    "มุกดาหาร_1": ["พลังประชารัฐ", "ภูมิใจไทย", 1, "มุกดาหาร", "นายวิริยะ  ทองผา"],
+    "ยโสธร_1": ["ไทยสร้างไทย", "ภูมิใจไทย", 1, "ยโสธร", "นางสุภาพร  สลับศรี"],
+    "ราชบุรี_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "ราชบุรี", "นางสาวกุลวลี  นพอมรบดี"],
+    "ราชบุรี_4": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 4, "ราชบุรี", "นายอัครเดช  วงษ์พิทักษ์โรจน์"],
+    "ร้อยเอ็ด_1": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 1, "ร้อยเอ็ด", "นายอนุรักษ์  จุรีมาศ"],
+    "สงขลา_1": ["ประชาธิปัตย์", "ภูมิใจไทย", 1, "สงขลา", "นายสรรเพชญ  บุญญามณี"],
+    "สงขลา_3": ["ประชาธิปัตย์", "ภูมิใจไทย", 3, "สงขลา", "นายสมยศ  พลายด้วง"],
+    "สระบุรี_2": ["เพื่อไทย", "ภูมิใจไทย", 2, "สระบุรี", "นายอรรถพล  วงษ์ประยูร"],
+    "สิงห์บุรี_1": ["พลังประชารัฐ", "ภูมิใจไทย", 1, "สิงห์บุรี", "นายโชติวุฒิ  ธนาคมานุสรณ์"],
+    "สุพรรณบุรี_1": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 1, "สุพรรณบุรี", "นายสรชัด  สุจิตต์"],
+    "สุพรรณบุรี_2": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 2, "สุพรรณบุรี", "นายณัฐวุฒิ  ประเสริฐสุวรรณ"],
+    "สุพรรณบุรี_4": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 4, "สุพรรณบุรี", "นายเสมอกัน  เที่ยงธรรม"],
+    "สุพรรณบุรี_5": ["ชาติไทยพัฒนา", "ภูมิใจไทย", 5, "สุพรรณบุรี", "นายประภัตร  โพธสุธน"],
+    "สุราษฎร์ธานี_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "สุราษฎร์ธานี", "นางสาวกานสินี  โอภาสรังสรรค์"],
+    "สุราษฎร์ธานี_2": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 2, "สุราษฎร์ธานี", "นายพิพิธ  รัตนรักษ์"],
+    "อุดรธานี_3": ["ไทยสร้างไทย", "ภูมิใจไทย", 3, "อุดรธานี", "นายหรั่ง  ธุระพล"],
+    "อุดรธานี_6": ["ไทยสร้างไทย", "ภูมิใจไทย", 6, "อุดรธานี", "นายอดิศักดิ์  แก้วมุงคุณทรัพย์"],
+    "อุบลราชธานี_7": ["เพื่อไทย", "ภูมิใจไทย", 7, "อุบลราชธานี", "นางสาวสุดารัตน์  พิทักษ์พรพัลลภ"],
+    "เพชรบุรี_1": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 1, "เพชรบุรี", "นางธิวัลรัตน์  อังกินันทน์"],
+    "เพชรบุรี_3": ["รวมไทยสร้างชาติ", "ภูมิใจไทย", 3, "เพชรบุรี", "จ่าอากาศเอกอภิชาติ  แก้วโกศล"],
+    "เพชรบูรณ์_1": ["พลังประชารัฐ", "ภูมิใจไทย", 1, "เพชรบูรณ์", "นางสาวพิมพ์พร  พรพฤฒิพันธุ์"],
+    "เพชรบูรณ์_3": ["พลังประชารัฐ", "ภูมิใจไทย", 3, "เพชรบูรณ์", "นายบุญชัย  กิตติธาราทรัพย์"],
+    "เพชรบูรณ์_4": ["พลังประชารัฐ", "ภูมิใจไทย", 4, "เพชรบูรณ์", "นายวรโชติ  สุคนธ์ขจร"],
+    "เพชรบูรณ์_5": ["พลังประชารัฐ", "ภูมิใจไทย", 5, "เพชรบูรณ์", "นางวันเพ็ญ  พร้อมพัฒน์"],
+    "เพชรบูรณ์_6": ["พลังประชารัฐ", "ภูมิใจไทย", 6, "เพชรบูรณ์", "นายอัคร  ทองใจสด"],
+    "แม่ฮ่องสอน_2": ["ประชาธิปัตย์", "ภูมิใจไทย", 2, "แม่ฮ่องสอน", "นายสมบัติ  ยะสินธุ์"],
+    "ชัยนาท_1": ["รวมไทยสร้างชาติ", "เพื่อไทย", 1, "ชัยนาท", "นายอนุชา  นาคาศัย"],
+    "สุราษฎร์ธานี_3": ["รวมไทยสร้างชาติ", "ไทรวมพลัง", 3, "สุราษฎร์ธานี", "นางสาววชิราภรณ์  กาญจนะ"],
+  };
+
+  const PITCH = 22;
+  const zoneCenters = {};
+  Object.entries(L).forEach(([name, cfg]) => {
+    const [ox, oy] = cfg.o;
+    let list = [];
+    if (cfg.pts) {
+      list = cfg.pts.map(([dx, dy]) => [ox + dx, oy + dy]);
+    } else {
+      cfg.rows.forEach(([dx, n], r) => {
+        for (let i = 0; i < n; i++) list.push([ox + dx + i * PITCH, oy + r * PITCH]);
+      });
+    }
+    zoneCenters[name] = list;
+  });
+
+  function getZoneCenter(provName, zoneNum) {
+    const list = zoneCenters[provName];
+    if (!list) return null;
+    if (list[zoneNum - 1]) return list[zoneNum - 1];
+    const last = list[list.length - 1];
+    return [last[0] + (zoneNum - list.length) * PITCH, last[1]];
+  }
+
+const normP = p => (p === 'ก้าวไกล' ? 'ประชาชน' : (p === 'เพื่อไทรวมพลัง' ? 'ไทรวมพลัง' : p));
+const colorOf = p => partyColors[p] || (p === 'ก้าวไกล' ? partyColors['ประชาชน'] : '#6B7280');
+const fmt = n => n.toLocaleString('en-US');
+const pct = (a, b, d = 1) => (a / b * 100).toFixed(d);
+
+function loadCSV(file) { return d3.csv(file).catch(() => []); }
+function parseCon(rows) {
+  const map = new Map();
+  rows.forEach(r => {
+    const prov = (r['จังหวัด'] || '').trim().replace('กานต์จนบุรี', 'กาญจนบุรี');
+    const zone = parseInt(r['เขต']); if (!prov || !zone) return;
+    const v = parseInt(String(r['คะแนน'] || r['ผลคะแนน'] || '0').replace(/,/g, '')) || 0;
+    const key = prov + '_' + zone;
+    if (!map.has(key)) map.set(key, { prov, zone, key, c: [] });
+    map.get(key).c.push({ party: normP((r['สังกัดพรรค'] || r['พรรค'] || '').trim()), v, bigfam: (r['บ้านใหญ่'] || '').trim() === 'ใช่' });
+  });
+  map.forEach(z => { z.c.sort((a, b) => b.v - a.v); z.total = d3.sum(z.c, c => c.v); z.win = z.c[0]; });
+  return map;
+}
+
+const FILES = ['election_result-con_69.csv', 'election_result-con_66.csv', 'election_result-party_69.csv', 'election_result-party_66.csv',
+  'GPP_2567.csv', 'province_urbanization_N.csv', 'quality_of_life.csv', 'non_voters_69.csv'];
+const H_PICK = 'ชลบุรี พระนครศรีอยุธยา จันทบุรี สระบุรี สุราษฎร์ธานี นครปฐม ราชบุรี สงขลา ประจวบคีรีขันธ์ เพชรบุรี'.split(' ');
+const I_PICK = 'ชลบุรี นครปฐม พระนครศรีอยุธยา สระบุรี ตราด สิงห์บุรี ราชบุรี จันทบุรี นครสวรรค์ ลพบุรี'.split(' ');
+const J_PICK = [['ชลบุรี', 8], ['สระบุรี', 1], ['จันทบุรี', 1], ['ชลบุรี', 1], ['สุราษฎร์ธานี', 1], ['ประจวบคีรีขันธ์', 2], ['นครสวรรค์', 3], ['ตราด', 1], ['นครสวรรค์', 4], ['นครสวรรค์', 5]];
+const ORANGE = colorOf('ประชาชน'), GREY_D = '#4A5568', GREY_M = '#A0AEC0', GREY_L = '#CBD5E1';
+const pn = (p, y) => (y === 66 && p === 'ประชาชน' ? 'ก้าวไกล' : p);
+
+Promise.all(FILES.map(loadCSV)).then(([c69r, c66r, p69r, p66r, gppR, urbR, qolR, nvR]) => {
+  const con69 = parseCon(c69r), con66 = parseCon(c66r), list69 = parseCon(p69r), list66 = parseCon(p66r);
+  const nvMap = new Map(nvR.map(r => [(r['จังหวัด'] || '').trim() + '_' + parseInt(r['เขต']), parseFloat(r['ร้อยละผู้ไม่มาใช้สิทธิ'])]));
+  const NV_AVG = d3.mean([...nvMap.values()]);
+
+  // ---------- รายเขต ----------
+  const zones = [];
+  Object.keys(zoneCenters).forEach(prov => zoneCenters[prov].forEach((_, i) => {
+    const key = prov + '_' + (i + 1), a = con69.get(key); if (!a) return;
+    const [cx, cy] = getZoneCenter(prov, i + 1), b = con66.get(key), l = list69.get(key);
+    const pr = a.c.findIndex(c => c.party === 'ประชาชน');
+    zones.push({ key, prov, zone: i + 1, x: cx - 10, y: cy - 10,
+      w69: a.win.party, w66: b ? b.win.party : null, l69: l ? l.win.party : null, l66: (list66.get(key) || {}).win ? list66.get(key).win.party : null,
+      margin: a.c[1] ? (a.c[0].v - a.c[1].v) / a.total * 100 : 100, prank: pr < 0 ? null : pr + 1,
+      xs: (() => { if (pr < 0 || !a.total) return null; const sP = a.c[pr].v / a.total, rv = pr === 0 ? a.c[1] : a.c[0], sT = rv ? rv.v / a.total : 0, den = 1 - sP + sT; return den > 0 ? (sT - sP) * (1 - sP) / den * 100 : -100; })(),
+      bigfam: a.c.some(c => c.bigfam), bigfamWin: a.win.bigfam, switched: !!SWITCHED_MAP[key], nv: nvMap.get(key) });
+  }));
+  const N = zones.length;
+  const count = (arr, f) => d3.rollups(arr, v => v.length, f).sort((x, y) => y[1] - x[1]);
+  const top = (arr, n = 5) => arr.slice(0, n).map(x => x[0]);
+  const seatOf = (arr, p) => (arr.find(x => x[0] === p) || [p, 0])[1];
+
+  // ---------- ที่นั่ง: แบ่งเขต + บัญชีรายชื่อ (เศษมากสุด 100 ที่นั่ง) ----------
+  const listVotes = m => { const r = new Map(); m.forEach(z => z.c.forEach(c => r.set(c.party, (r.get(c.party) || 0) + c.v))); return r; };
+  function alloc(votes, n = 100) {
+    const tot = d3.sum([...votes.values()]), q = [...votes].map(([p, v]) => [p, v / tot * n]);
+    const base = new Map(q.map(([p, x]) => [p, Math.floor(x)])); let rest = n - d3.sum([...base.values()]);
+    q.map(([p, x]) => [p, x - Math.floor(x)]).sort((a, b) => b[1] - a[1]).slice(0, rest).forEach(([p]) => base.set(p, base.get(p) + 1));
+    return base;
+  }
+  const seatTable = (conZones, listM) => {
+    const cs = new Map(count(conZones, z => z.w), ), ls = alloc(listVotes(listM)), ps = new Set([...cs.keys(), ...ls.keys()]);
+    return [...ps].map(p => ({ p, con: cs.get(p) || 0, list: ls.get(p) || 0, tot: (cs.get(p) || 0) + (ls.get(p) || 0) })).filter(r => r.tot > 0);
+  };
+  const T69 = seatTable([...con69.values()].map(z => ({ w: z.win.party })), list69), T66 = seatTable([...con66.values()].map(z => ({ w: z.win.party })), list66);
+  const tot = (T, p, k = 'tot') => (T.find(r => r.p === p) || { [k]: 0 })[k];
+  const totSeats = T => d3.sum(T, r => r.tot);
+  const dChg = (a, b) => (b - a) / a * 100;
+
+  const seats69 = count(zones, z => z.w69), seats66 = count(zones.filter(z => z.w66), z => z.w66);
+  const listWins69 = count(zones.filter(z => z.l69), z => z.l69);
+  const shareMap = (m) => { const v = listVotes(m), t = d3.sum([...v.values()]); return [...v].map(([p, x]) => [p, x / t * 100]).sort((a, b) => b[1] - a[1]); };
+  const conSh = shareMap(con69), listSh = shareMap(list69);
+  const diffZones = zones.filter(z => z.l69 && z.l69 !== z.w69);
+  const bf = zones.filter(z => z.bigfam), close = zones.filter(z => z.margin < 5);
+  const r1 = close.filter(z => z.prank === 1), r2 = close.filter(z => z.prank === 2);
+
+  // ---------- แผนที่ (ใช้ซ้ำได้หลายอัน) ----------
+  function mkMap(svgNode) {
+    const svg = d3.select(svgNode);
+    svg.selectAll('.prov-label').data(Object.entries(L).filter(([, c]) => c.label)).enter().append('text').attr('class', 'prov-label')
+      .attr('x', ([, c]) => c.label[0]).attr('y', ([, c]) => c.label[1]).attr('text-anchor', ([, c]) => c.label[2] === 's' ? 'start' : 'middle').text(([n, c]) => c.text || n);
+    const g = svg.selectAll('.zone').data(zones, d => d.key).enter().append('g').attr('class', 'zone').attr('transform', d => `translate(${d.x},${d.y})`);
+    g.append('rect').attr('width', 20).attr('height', 20).attr('rx', 3).attr('fill', GREY_L);
+    g.append('polygon').attr('class', 'won-mark').attr('points', '10,0 20,0 20,10').style('display', 'none').style('pointer-events', 'none');
+    g.append('title').text(d => `${d.prov} เขต ${d.zone} · ${d.w69}`);
+    return {
+      paint({ fill, color, show = () => true, ring = () => false, faded = 0.14, mark = () => false }) {
+        g.classed('ring', d => ring(d));
+        const fc = d => show(d) ? (color ? color(d) : colorOf(fill(d) || '')) : GREY_L;
+        g.select('rect').transition().duration(600).attr('fill', fc).attr('opacity', d => show(d) ? 1 : faded)
+          .attr('stroke', d => { const c = d3.color(fc(d)); return c && c.r + c.g + c.b > 735 ? '#CBD5E0' : '#fff'; });
+        g.select('polygon.won-mark').style('display', d => show(d) && mark(d) ? null : 'none');
+        g.filter(d => ring(d)).raise();
+      } };
+  }
+  const mapS = mkMap(document.querySelector('#mapS svg'));
+  const [dmSvgL, dmSvgR] = document.querySelectorAll('#mapD svg');
+  const mapL = mkMap(dmSvgL), mapR = mkMap(dmSvgR);
+  const paintDual = (fl, fr, show = () => true, color) => { mapL.paint({ fill: fl, show, color: color && (z => color(z, 'L')) }); mapR.paint({ fill: fr, show, color: color && (z => color(z, 'R')) }); };
+  const legend = (parties, cap, colors) => d3.select('#legend').html((cap ? `<div class="cap">${cap}</div>` : '') + parties.map(p => `<span style="--c:${(colors && colors[p]) || colorOf(p)}">${p}</span>`).join(''));
+  const bar = (arr, total) => `<div class="sbar">${arr.slice(0, 7).map(([p, n]) => `<i title="${p} ${n}" style="width:${n / total * 100}%;background:${colorOf(p)}"></i>`).join('')}</div>
+    <div class="sbar-leg">${arr.slice(0, 5).map(([p, n]) => `<span style="--c:${colorOf(p)}">${p} ${n}</span>`).join('')}</div>`;
+  const votebar = (el, sh) => d3.select(el).html(`<div class="sbar">${sh.slice(0, 7).map(([p, x]) => `<i style="width:${x}%;background:${colorOf(p)}" title="${p} ${x.toFixed(1)}%"></i>`).join('')}</div>
+    <div class="sbar-leg">${sh.slice(0, 4).map(([p, x]) => `<span style="--c:${colorOf(p)}">${p} ${x.toFixed(1)}%</span>`).join('')}</div>`);
+
+  // ---------- ตารางที่นั่ง + ครึ่งวงกลม ----------
+  const panel = d3.select('#panel');
+  function seatsPanel(years, tab0) {
+    let tab = tab0 || 'tot', view = years.length > 1 ? 'chart' : 'table';
+    const draw = () => {
+      const T = (y) => (y === 66 ? T66 : T69);
+      const parties = [...new Set(years.flatMap(y => T(y).map(r => r.p)))];
+      const key = p => d3.max(years, y => tot(T(y), p, tab));
+      parties.sort((a, b) => d3.descending(tot(T(years[years.length - 1]), a, tab), tot(T(years[years.length - 1]), b, tab)) || d3.descending(key(a), key(b)));
+      const shown = parties.slice(0, 9);
+      const cols = [['con', 'แบ่งเขต'], ['list', 'รายชื่อ'], ['tot', 'รวม']];
+      let h = `<h3>จำนวนที่นั่ง ส.ส. ${years.length > 1 ? 'ปี 2566 เทียบ 2569' : 'ปี 2569'} (500 ที่นั่ง)</h3>
+        ${years.length > 1 ? `<div class="tabs vt">${[['chart', 'กราฟ'], ['table', 'ตาราง']].map(([k, n]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${n}</button>`).join('')}</div>` : ''}
+        <div class="tabs">${[['tot', 'รวม'], ['con', 'แบ่งเขต'], ['list', 'รายชื่อ']].map(([k, n]) => `<button data-k="${k}" class="${tab === k ? 'on' : ''}">เรียงตาม${n}</button>`).join('')}</div>
+        <table class="st"><thead>${years.length > 1 ? `<tr class="gr"><th></th>${years.map(y => `<th colspan="3">ปี 25${y}</th>`).join('')}</tr>` : ''}
+        <tr><th>พรรค</th>${years.map(() => cols.map(([k, n]) => `<th class="${k === tab ? 'em' : ''}">${n}</th>`).join('')).join('')}</tr></thead><tbody>`;
+      shown.forEach(p => { h += `<tr><td><span class="dot" style="background:${colorOf(p)}"></span>${years.length > 1 ? (p === 'ประชาชน' ? 'ก้าวไกล → ประชาชน' : p) : p}</td>` +
+        years.map(y => cols.map(([k]) => `<td class="${k === tab ? 'em' : ''}">${tot(T(y), p, k) || '–'}</td>`).join('')).join('') + '</tr>'; });
+      if (view === 'chart') {
+        const mx = d3.max(shown, p => d3.max(years, y => tot(T(y), p, tab))) || 1, nm = p => p === 'ประชาชน' ? 'ก้าวไกล → ประชาชน' : p;
+        h = h.slice(0, h.indexOf('<table')) + `<div class="sc-leg"><span class="o"></span>ปี 2566 <span class="s"></span>ปี 2569 <em>ตัวเลขท้ายแถว = เปลี่ยนแปลง (ที่นั่ง)</em></div><div class="sc">` + shown.map(p => {
+          const a = tot(T(66), p, tab), b = tot(T(69), p, tab), d = b - a, c = colorOf(p);
+          return `<div class="scr"><div class="scn"><span class="dot" style="background:${c}"></span>${nm(p)}</div><div class="scb">
+            <div class="bar" style="width:${a / mx * 86}%;background:${c};opacity:.35"><i>${a || ''}</i></div>
+            <div class="bar" style="width:${b / mx * 86}%;background:${c}"><i>${b || ''}</i></div></div>
+            <div class="scd ${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(d)}</div></div>`; }).join('') + `</div>
+        <div class="src">ที่นั่งบัญชีรายชื่อ 100 ที่นั่ง คำนวณจากคะแนนบัญชีรายชื่อรวมทั้งประเทศแบบสัดส่วน (เศษมากสุด)</div>`;
+        panel.html(h); panel.selectAll('.tabs:not(.vt) button').on('click', function () { tab = this.dataset.k; draw(); }); panel.selectAll('.vt button').on('click', function () { view = this.dataset.v; draw(); }); return;
+      }
+      h += `<tr><td><b>รวม</b></td>${years.map(y => cols.map(([k]) => `<td class="${k === tab ? 'em' : ''}"><b>${d3.sum(T(y), r => r[k])}</b></td>`).join('')).join('')}</tr></tbody></table>
+        <div class="src">ที่นั่งบัญชีรายชื่อ 100 ที่นั่ง คำนวณจากคะแนนบัญชีรายชื่อรวมทั้งประเทศแบบสัดส่วน (เศษมากสุด)</div>`;
+      panel.html(h); panel.selectAll('.tabs:not(.vt) button').on('click', function () { tab = this.dataset.k; draw(); }); panel.selectAll('.vt button').on('click', function () { view = this.dataset.v; draw(); });
+    };
+    draw();
+  }
+  function parlPanel() {
+    const mk = (T, y) => {
+      const rows = T.slice().sort((a, b) => b.tot - a.tot), tt = d3.sum(rows, r => r.tot);
+      const NR = 9, rr = d3.range(NR).map(i => 64 + i * (130 - 64) / (NR - 1)), sr = d3.sum(rr), cnt = rr.map(r => Math.floor(tt * r / sr));
+      for (let k = 0; d3.sum(cnt) < tt; k = (k + 1) % NR) cnt[NR - 1 - k]++;
+      const seats = []; rr.forEach((r, i) => d3.range(cnt[i]).forEach(j => { const th = Math.PI * (1 - (j + 0.5) / cnt[i]); seats.push({ r, th, x: r * Math.cos(th), y: -r * Math.sin(th) }); }));
+      seats.sort((a, b) => d3.descending(a.th, b.th) || a.r - b.r);
+      let si = 0; const paths = rows.map(rw => { const sl = seats.slice(si, si + rw.tot); si += rw.tot; return sl.map(s => `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="2.9" fill="${colorOf(rw.p)}"><title>${pn(rw.p, y)} ${rw.tot}</title></circle>`).join(''); }).join('');
+      return `<div><h4>ปี 25${y}</h4><svg viewBox="-138 -138 276 150">${paths}<text y="-8" text-anchor="middle" font-size="26" font-weight="600" fill="#2D3748">${tt}</text><text y="8" text-anchor="middle" font-size="11" fill="#64748b">ที่นั่งทั้งหมด</text></svg>
+        <div class="sbar-leg" style="justify-content:center">${rows.slice(0, 5).map(r => `<span style="--c:${colorOf(r.p)}">${pn(r.p, y)} ${r.tot}</span>`).join('')}</div></div>`;
+    };
+    const a = tot(T66, 'ประชาชน'), b = tot(T69, 'ประชาชน'), c = tot(T66, 'ภูมิใจไทย'), d = tot(T69, 'ภูมิใจไทย');
+    panel.html(`<h3>สัดส่วนที่นั่ง ส.ส. ปี 2566 เทียบ 2569</h3><div class="parl">${mk(T66, 66)}${mk(T69, 69)}</div>
+      <table class="st" style="margin-top:12px"><thead><tr><th>พรรค</th><th>ปี 66</th><th>ปี 69</th><th>เปลี่ยนแปลง</th></tr></thead><tbody>
+      <tr><td><span class="dot" style="background:${ORANGE}"></span>ก้าวไกล → ประชาชน</td><td>${a}</td><td>${b}</td><td style="color:#b91c1c"><b>${dChg(a, b).toFixed(2)}%</b></td></tr>
+      <tr><td><span class="dot" style="background:${colorOf('ภูมิใจไทย')}"></span>ภูมิใจไทย</td><td>${c}</td><td>${d}</td><td style="color:#15803d"><b>+${dChg(c, d).toFixed(2)}%</b></td></tr></tbody></table>`);
+  }
+
+  // ---------- Sankey ----------
+  const flows = d3.rollups(Object.values(SWITCHED_MAP), v => v.length, d => normP(d[0]), d => normP(d[1]));
+  const links = []; flows.forEach(([f, ts]) => ts.forEach(([t, n]) => links.push({ f, t, n })));
+  const nSw = d3.sum(links, l => l.n);
+  const fromT = d3.rollups(links, v => d3.sum(v, d => d.n), d => d.f).sort((a, b) => b[1] - a[1]);
+  const toT = d3.rollups(links, v => d3.sum(v, d => d.n), d => d.t).sort((a, b) => b[1] - a[1]);
+  function sankeyPanel() {
+    panel.html('<svg id="skv" viewBox="0 0 400 560" style="width:100%;flex:1 1 auto;min-height:0"></svg>');
+    const s = d3.select('#skv'), W = 400, Hh = 560, top0 = 70, bot = 30, gap = 8, nodeW = 14, xl = 120, xr = 266;
+    const unit = (Hh - top0 - bot - gap * Math.max(fromT.length, toT.length)) / nSw;
+    const place = arr => { let y = top0; const m = new Map(); arr.forEach(([p, n]) => { m.set(p, { y, h: n * unit, off: 0, n }); y += n * unit + gap; }); return m; };
+    const L0 = place(fromT), R0 = place(toT);
+    s.append('text').attr('x', W / 2).attr('y', 26).attr('text-anchor', 'middle').attr('font-size', 15).attr('font-weight', 600).attr('fill', '#2D3748').text(`ผู้สมัครคนเดิมที่ย้ายพรรค (${nSw} เขต)`);
+    s.append('text').attr('x', W / 2).attr('y', 46).attr('text-anchor', 'middle').attr('font-size', 10.5).attr('fill', '#64748b').text('คลิกที่แท่งพรรคเพื่อเน้นเส้นทางของพรรคนั้น');
+    const paths = [];
+    links.slice().sort((a, b) => b.n - a.n).forEach(l => {
+      const a = L0.get(l.f), b = R0.get(l.t), h = l.n * unit, y0 = a.y + a.off + h / 2, y1 = b.y + b.off + h / 2; a.off += h; b.off += h; const mx = (xl + nodeW + xr) / 2;
+      const p = s.append('path').datum(l).attr('d', `M${xl + nodeW},${y0} C${mx},${y0} ${mx},${y1} ${xr},${y1}`).attr('fill', 'none').attr('stroke', colorOf(l.t)).attr('stroke-opacity', .5).attr('stroke-width', Math.max(h, 1.5));
+      p.append('title').text(`${l.f} → ${l.t}: ${l.n} เขต`); paths.push(p);
+    });
+    let sel = null;
+    const hl = () => paths.forEach(p => { const d = p.datum(), on = !sel || d.f === sel || d.t === sel; p.attr('stroke-opacity', on ? (sel ? .85 : .5) : .08); });
+    const node = (m, x, anchor, dx) => m.forEach((v, p) => {
+      const gg = s.append('g').attr('class', 'sk-node').on('click', () => { sel = sel === p ? null : p; hl(); });
+      gg.append('rect').attr('x', x).attr('y', v.y).attr('width', nodeW).attr('height', Math.max(v.h, 2)).attr('rx', 2).attr('fill', colorOf(p));
+      gg.append('text').attr('x', x + dx).attr('y', v.y + Math.max(v.h, 2) / 2 + 4).attr('text-anchor', anchor).attr('font-size', 12).attr('fill', '#1e293b').text(`${p} ${v.n}`);
+    });
+    node(L0, xl, 'end', -6); node(R0, xr, 'start', nodeW + 6);
+    s.append('text').attr('x', xl).attr('y', 62).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', '#64748b').text('พรรคเดิม (66)');
+    s.append('text').attr('x', xr + nodeW).attr('y', 62).attr('font-size', 11).attr('fill', '#64748b').text('พรรคใหม่ (69)');
+  }
+
+  // ---------- Scatter ----------
+  const provShare = (() => { const m = new Map(); list69.forEach(z => { const o = m.get(z.prov) || { a: 0, t: 0 }; z.c.forEach(c => { o.t += c.v; if (c.party === 'ประชาชน') o.a += c.v; }); m.set(z.prov, o); }); return m; })();
+  const conWon = d3.rollup(zones.filter(z => z.w69 === 'ประชาชน'), v => v.length, z => z.prov);
+  const provN = d3.rollup(zones, v => v.length, z => z.prov);
+  const gppM = new Map(gppR.map(r => [(r['จังหวัด'] || '').trim(), +r['GPP ต่อหัว 2567p (บาท)']]));
+  const urbM = new Map(urbR.map(r => [(r['จังหวัด'] || '').trim(), +r['สัดส่วนในเขตเทศบาล(%)']]));
+  const qolM = new Map(qolR.map(r => [(r['จังหวัด'] || '').trim(), +r['ดัชนีคุณภาพชีวิต']]));
+  const provWin = (() => { const m = new Map(); d3.group(zones, z => z.prov).forEach((zs, p) => {
+    const cnt = d3.rollup(zs, v => v.length, z => z.w69), vot = new Map(); (con69.get(p + '_1') ? zs : []).forEach(z => con69.get(z.key).c.forEach(c => vot.set(c.party, (vot.get(c.party) || 0) + c.v)));
+    const best = [...cnt].sort((a, b) => d3.descending(a[1], b[1]) || d3.descending(vot.get(a[0]) || 0, vot.get(b[0]) || 0))[0];
+    m.set(p, { party: best[0], n: best[1], tie: [...cnt].filter(x => x[1] === best[1]).length > 1 });
+  }); return m; })();
+  const provs = [...gppM.keys()].filter(p => provWin.has(p)).map(p => ({ p, gpp: gppM.get(p), urb: urbM.has(p) ? urbM.get(p) : NaN, qol: qolM.has(p) ? qolM.get(p) : NaN, sh: provShare.has(p) ? provShare.get(p).a / provShare.get(p).t * 100 : NaN, won: conWon.get(p) || 0, n: provN.get(p) || 0, win: provWin.get(p).party, winN: provWin.get(p).n }));
+  const corr = (xs, ys) => { const mx = d3.mean(xs), my = d3.mean(ys); return d3.sum(xs.map((x, i) => (x - mx) * (ys[i] - my))) / Math.sqrt(d3.sum(xs.map(x => (x - mx) ** 2)) * d3.sum(ys.map(y => (y - my) ** 2))); };
+  function scatterPanel(xk, xl, pick) {
+    const pv = provs.filter(d => isFinite(d[xk]) && isFinite(d.gpp));
+    if (!pv.length) { panel.html(`<h3>${xl} × GPP ต่อหัว</h3><div class="soon">ไม่พบข้อมูลสำหรับกราฟนี้ — ตรวจว่ามีไฟล์ GPP_2567.csv, province_urbanization_N.csv และ quality_of_life.csv อยู่ข้าง story.html</div>`); return; }
+    panel.html('<svg id="scv" class="scat" viewBox="0 0 440 520" style="width:100%;flex:1 1 auto;min-height:0"></svg>');
+    const s = d3.select('#scv'), m = { l: 58, r: 14, t: 40, b: 48 }, w = 440 - m.l - m.r, h = 520 - m.t - m.b;
+    const x = d3.scaleLinear([0, 100], [0, w]), y = d3.scaleLinear([0, d3.max(pv, d => d.gpp) * 1.05], [h, 0]);
+    const mx = d3.median(pv, d => d[xk]), my = d3.median(pv, d => d.gpp);
+    s.append('text').attr('x', 220).attr('y', 20).attr('text-anchor', 'middle').attr('font-size', 14).attr('font-weight', 600).attr('fill', '#2D3748').text(`${xl} × GPP ต่อหัว (77 จังหวัด)`);
+    const g = s.append('g').attr('transform', `translate(${m.l},${m.t})`);
+    g.append('rect').attr('x', x(mx)).attr('y', 0).attr('width', w - x(mx)).attr('height', y(my)).attr('fill', '#fff7ed');
+    g.append('text').attr('x', w - 4).attr('y', 14).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', '#c2410c').text('ขวาบน = สูงกว่าค่ากลางทั้งสองแกน');
+    g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(5)).attr('font-size', 10);
+    g.append('g').call(d3.axisLeft(y).ticks(6).tickFormat(v => (v / 1000) + 'k')).attr('font-size', 10);
+    g.append('text').attr('x', w / 2).attr('y', h + 36).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#475569').text(xl);
+    g.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -44).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#475569').text('GPP ต่อหัว (บาท/คน/ปี)');
+    g.append('line').attr('x1', x(mx)).attr('x2', x(mx)).attr('y1', 0).attr('y2', h).attr('stroke', '#94a3b8').attr('stroke-dasharray', '4 3');
+    g.append('line').attr('x1', 0).attr('x2', w).attr('y1', y(my)).attr('y2', y(my)).attr('stroke', '#94a3b8').attr('stroke-dasharray', '4 3');
+    const isP = d => pick.includes(d.p);
+    g.selectAll('circle').data(pv.slice().sort((a, b) => isP(a) - isP(b))).enter().append('circle').attr('cx', d => x(d[xk])).attr('cy', d => y(d.gpp)).attr('r', d => isP(d) ? 6.5 : 4.5)
+      .attr('fill', d => colorOf(d.win)).attr('stroke', d => isP(d) ? '#111' : '#fff').attr('stroke-width', d => isP(d) ? 1.8 : 1)
+      .append('title').text(d => `${d.p}\n${xl} ${d[xk].toFixed(1)} · GPP/หัว ${fmt(Math.round(d.gpp))}\nพรรคที่ชนะมากที่สุด: ${d.win} (${d.winN}/${d.n} เขต) · ประชาชนชนะ ${d.won}/${d.n} เขต`);
+    const lab = pv.filter(isP).sort((a, b) => b.gpp - a.gpp); const placed = [];
+    lab.forEach(d => { let ly = y(d.gpp) - 9; while (placed.some(q => Math.abs(q - ly) < 10)) ly += 10; placed.push(ly);
+      g.append('text').attr('x', x(d[xk]) + 9).attr('y', ly + 12).attr('font-size', 10).attr('font-weight', 600).attr('fill', '#111').attr('paint-order', 'stroke').attr('stroke', '#fff').attr('stroke-width', 3).text(d.p); });
+    d3.select('#panel').append('div').attr('class', 'src').html(`สีจุด = สีประจำพรรคที่ชนะแบ่งเขตมากที่สุดในจังหวัดนั้น · จุดขอบดำ = จังหวัดเป้าหมาย ${pick.length} จังหวัด · เส้นประ = ค่ากลาง (median) ของแต่ละแกน`);
+    const ps = d3.rollups(pv, v => v.length, d => d.win).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    d3.select('#legend').html(`<div class="cap">${xl} × GPP ต่อหัว · สีจุด = พรรคที่ชนะแบ่งเขตมากที่สุดในจังหวัด</div>` + ps.map(p => `<span style="--c:${colorOf(p)}">${p}</span>`).join(''));
+  }
+
+  // ---------- Q14: เขตลำดับความสำคัญ ----------
+  const J = J_PICK.map(([p, zn]) => zones.find(z => z.prov === p && z.zone === zn)).filter(Boolean);
+
+  // ---------- ฉาก ----------
+  const pctOf = (a, b) => (a / b * 100).toFixed(2);
+  const bfDiff = bf.filter(z => z.l69 && z.l69 !== z.w69).length;
+  const sw1 = fromT[0], sw2 = toT[0];
+  const S = [
+    { part: 'Part 1', n: 'ข้อ 1', head: 'ผลการเลือกตั้งปี 69 เป็นอย่างไร', title: `ภูมิใจไทยชนะ ปี 69 ด้วย ${pctOf(tot(T69, 'ภูมิใจไทย'), totSeats(T69))}%`, mode: 'panel',
+      html: `<p>ภูมิใจไทยได้ <b>${tot(T69, 'ภูมิใจไทย')}</b> จาก ${totSeats(T69)} ที่นั่ง (แบ่งเขต ${tot(T69, 'ภูมิใจไทย', 'con')} + บัญชีรายชื่อ ${tot(T69, 'ภูมิใจไทย', 'list')})</p>
+        <div class="kpis"><div class="kpi"><b style="color:${colorOf('ภูมิใจไทย')}">${tot(T69, 'ภูมิใจไทย')}</b><span>ที่นั่งรวม</span></div><div class="kpi"><b>${pctOf(tot(T69, 'ภูมิใจไทย'), totSeats(T69))}%</b><span>ของ ส.ส. ทั้งสภา</span></div></div>`,
+      run() { seatsPanel([69]); legend([], 'ตาราง: แบ่งเขต | รายชื่อ | รวม'); } },
+    { part: 'Part 1', n: 'ข้อ 1', head: 'เทียบคะแนนปี 66 vs 69', title: 'ก้าวไกลเคยเป็นแชมป์ ภูมิใจไทยพลิกมาเป็นแชมป์', mode: 'panel',
+      html: `<p>ปี 66 <b>ก้าวไกล</b> เคยเป็นแชมป์ด้วย <b>${tot(T66, 'ประชาชน')}</b> เก้าอี้</p>
+        <p>แต่ปี 69 <b>ประชาชน</b> ร่วงมาเป็นอันดับ 2 ด้วย <b>${tot(T69, 'ประชาชน')}</b> เก้าอี้ ในขณะที่ภูมิใจไทย อันดับ 3 ที่มีเพียง <b>${tot(T66, 'ภูมิใจไทย')}</b> เก้าอี้ พลิกมาเป็นแชมป์ด้วย <b class="hl">${tot(T69, 'ภูมิใจไทย')}</b> เก้าอี้</p>`,
+      run() { seatsPanel([66, 69]); legend([], 'กราฟเทียบที่นั่ง ปี 66 vs 69 · สลับดูตารางได้'); } },
+    { part: 'Part 1', n: 'ข้อ 1', head: 'เทียบคะแนนปี 66 vs 69', title: `ประชาชน ${dChg(tot(T66, 'ประชาชน'), tot(T69, 'ประชาชน')).toFixed(2)}% · ภูมิใจไทย +${dChg(tot(T66, 'ภูมิใจไทย'), tot(T69, 'ภูมิใจไทย')).toFixed(2)}%`, mode: 'panel',
+      html: `<p>พรรคประชาชน ที่นั่งลดลง <b class="hl">${Math.abs(dChg(tot(T66, 'ประชาชน'), tot(T69, 'ประชาชน'))).toFixed(2)}%</b></p>
+        <p>ในขณะที่พรรคภูมิใจไทย ที่นั่งเพิ่มขึ้นถึง <b>${dChg(tot(T66, 'ภูมิใจไทย'), tot(T69, 'ภูมิใจไทย')).toFixed(2)}%</b></p><div class="note">คำนวณจากที่นั่งรวม (แบ่งเขต + บัญชีรายชื่อ) ปี 66 เทียบปี 69</div>`,
+      run() { parlPanel(); legend([], 'ครึ่งวงกลม: จำนวนเก้าอี้ ปี 66 vs 69'); } },
+    { part: 'Part 1', n: 'ข้อ 2', head: 'จังหวัดไหนเลือกพรรคอะไร ในปี 69', title: 'แผนที่คู่: บัญชีรายชื่อ และ แบ่งเขต', mode: 'dual', dm: ['บัญชีรายชื่อ (ผู้นำในแต่ละเขต)', 'แบ่งเขต (ผู้ชนะ)'],
+      html: `<p>ซ้าย = พรรคที่ได้คะแนนบัญชีรายชื่อสูงสุดในแต่ละเขต · ขวา = พรรคที่ชนะแบ่งเขต</p><p>แถบใต้แผนที่คือคะแนนรวมทั้งประเทศของแต่ละแบบ</p>`,
+      run() { paintDual(z => z.l69, z => z.w69); votebar('#vbL', listSh); votebar('#vbR', conSh); legend(top(seats69), 'สีตามพรรค ปี 2569'); } },
+    { part: 'Part 1', n: 'ข้อ 3', head: 'แบบแบ่งเขตใครชนะ และบัญชีรายชื่อใครชนะ → เทรนการเลือกต่างกัน', title: 'แบ่งเขต: ภูมิใจไทยชนะ · รายชื่อ: ประชาชนชนะ', mode: 'dual', dm: ['บัญชีรายชื่อ', 'แบ่งเขต'],
+      html: `<p>แบบแบ่งเขต → <b style="color:${colorOf('ภูมิใจไทย')}">พรรคภูมิใจไทยชนะ</b> (${seatOf(seats69, 'ภูมิใจไทย')} เขต)</p>
+        <p>แบบรายชื่อ → <b style="color:${ORANGE}">พรรคประชาชนชนะ</b> (นำใน ${seatOf(listWins69, 'ประชาชน')} เขต)</p>`,
+      run() { paintDual(z => z.l69, z => z.w69); votebar('#vbL', listSh); votebar('#vbR', conSh); legend(top(seats69), 'สีตามพรรค ปี 2569'); } },
+    { part: 'Part 1', n: 'ข้อ 4', head: 'ทำไมผลการเลือกตั้งระหว่างแบ่งเขต และบัญชีรายชื่อต่างกัน', title: 'สัดส่วนแบ่งเขตต่อรายชื่อ ต่างกัน 4 : 1', mode: 'dual', dm: ['บัญชีรายชื่อ', 'แบ่งเขต'],
+      html: `<p>สัดส่วนที่นั่งแบ่งเขตต่อรายชื่อ แตกต่างกัน <b>4 : 1</b> มีผลให้ควรลงน้ำหนักที่แบบแบ่งเขตมากกว่า</p>
+        <div class="ratio"><span style="width:80%;background:#2D3748">แบ่งเขต 400</span><span style="width:20%;background:#94a3b8">รายชื่อ 100</span></div>
+        <div class="note">ผลสองบัตรต่างกันใน ${diffZones.length} จาก ${N} เขต (${pct(diffZones.length, N, 0)}%)</div>`,
+      run() { const set = new Set(diffZones.map(z => z.key)); paintDual(z => z.l69, z => z.w69, z => set.has(z.key)); votebar('#vbL', listSh); votebar('#vbR', conSh); legend([], 'แสดงเฉพาะเขตที่ผู้นำสองบัตรไม่ตรงกัน'); } },
+    { part: 'Part 1', n: 'ข้อ 5', head: 'ปัจจัยอะไรบ้างที่มีผล ตัวนักการเมืองส่งต่อผลต่อการชนะมั้ย และมีผลแค่ไหน', title: 'คนส่วนใหญ่เลือกที่ตัวบุคคล ไม่ได้เลือกที่พรรค', mode: 'dual', dm: ['บัญชีรายชื่อ (เขตบ้านใหญ่)', 'แบ่งเขต (เขตบ้านใหญ่)'],
+      html: `<p>กลุ่มคนจำนวนมากเลือกนักการเมืองโดย <b class="hl">เลือกที่ตัวบุคคล ไม่ได้เลือกที่พรรค</b></p><p>เนื่องจากผลคะแนนแบบแบ่งเขตและแบบรายชื่อ มีความแตกต่างกันอย่างเห็นได้ชัด</p>
+        <div class="note">แสดงเฉพาะ ${bf.length} เขตที่มีผู้สมัครบ้านใหญ่ · ผลสองบัตรต่างกัน ${pct(bfDiff, bf.length, 0)}% ของเขตเหล่านี้</div>`,
+      run() { const set = new Set(bf.map(z => z.key)); paintDual(z => z.l69, z => z.w69, z => set.has(z.key)); votebar('#vbL', listSh); votebar('#vbR', conSh); legend(top(seats69), 'เขตบ้านใหญ่ · สีตามพรรค'); } },
+    { part: 'Part 1', n: 'ข้อ 6', head: 'แล้วมีการดึงตัวมั้ย อย่างไร', title: 'ดึงตัวข้ามพรรค: พลังประชารัฐถูกดึงมากที่สุด', mode: 'panel',
+      html: `<p>หลายพรรคตระหนักถึงอิทธิพลของตัวบุคคล จึงดึงนักการเมืองข้ามพรรค · พรรคที่ถูกดึงตัวออกมากที่สุดคือ <b class="hl">${sw1[0]}</b> (${sw1[1]} เขต) และพรรคที่ได้ตัวมากที่สุดคือ <b>${sw2[0]}</b> (${sw2[1]} เขต)</p>
+        <div class="note">Sankey แสดงการไหล/การย้ายของผู้สมัครคนเดิม ${nSw} เขต</div>`,
+      run() { sankeyPanel(); legend([], 'Sankey: พรรคเดิม (66) → พรรคใหม่ (69)'); } },
+    { part: 'Part 1', n: 'ข้อ 7', head: 'มีกี่เขตบ้างที่สูสี', title: `ชนะขาด ${N - close.length} เขต · สูสี ${close.length} เขต`, mode: 'dual', dm: ['บัญชีรายชื่อ (เขตสูสี)', 'แบ่งเขต (เขตสูสี)'],
+      html: `<p>หลายพื้นที่กว่า <b>${N - close.length} เขต</b> เป็นเขตที่ชนะขาดลอย และอีก <b class="hl">${close.length} เขต</b> เป็นเขตที่มีผลการแข่งขันสูสี</p>
+        <div class="note">การแข่งขันสูสี หมายถึง เขตที่คะแนนอันดับ 1 ต่างจากอันดับ 2 น้อยกว่า 5%</div>`,
+      run() { const set = new Set(close.map(z => z.key)); paintDual(z => z.l69, z => z.w69, z => set.has(z.key)); votebar('#vbL', listSh); votebar('#vbR', conSh); legend(top(count(close, z => z.w69)), 'เขตสูสี · สีตามพรรค'); } },
+    { part: 'Part 2', n: 'ข้อ 8', head: 'ถ้าเราเป็นพรรคส้มเราจะทำอย่างไร', title: 'ส้มได้คะแนนรายชื่อมากกว่า → สู้ที่แบ่งเขต', mode: 'dual', dm: ['บัญชีรายชื่อ', 'แบ่งเขต'],
+      html: `<p>ผลการลงคะแนนให้พรรคประชาชน จะเห็นได้ว่าพรรคประชาชนได้คะแนนเสียงจากการลงคะแนนแบบ <b>บัญชีรายชื่อ</b> มากกว่า (นำ ${seatOf(listWins69, 'ประชาชน')} เขต)</p>
+        <p>ดังนั้นเราจะให้ความสำคัญที่การแข่งขันในส่วนของ <b>การเลือกตั้งแบบแบ่งเขต</b> ซึ่งในรอบปัจจุบันชนะไปเพียง <b class="hl">${seatOf(seats69, 'ประชาชน')} เขต จาก ${N} เขต</b> โดยเราต้องทำให้ ${seatOf(seats69, 'ประชาชน')} นี้ …</p>`,
+      run() { paintDual(null, null, () => true, (z, side) => (side === 'L' ? z.l69 : z.w69) === 'ประชาชน' ? ORANGE : GREY_L); votebar('#vbL', listSh.filter(x => x[0] === 'ประชาชน').concat(listSh.filter(x => x[0] !== 'ประชาชน'))); votebar('#vbR', conSh); legend(['ประชาชนนำ/ชนะ', 'พรรคอื่น'], 'พื้นที่สีส้ม = พรรคประชาชน', { 'ประชาชนนำ/ชนะ': ORANGE, 'พรรคอื่น': GREY_L }); } },
+    { part: 'Part 2', n: 'ข้อ 11', head: 'เขตไหนบ้างที่มีคะแนนสูสีกัน (ส้มชนะ / ส้มไม่ชนะ)', title: `${close.length} เขตสูสี: ส้มชนะ ${r1.length} · เกือบชนะ ${r2.length}`, mode: 'map', ctl: 'nv',
+      html: `<p><b class="hl">${close.length} เขต</b> ที่ผลการเลือกตั้งคะแนนสูสีกัน โดย</p>
+        <ul style="margin:0 0 6px 18px;padding:0;font-size:14.5px;line-height:1.8"><li><b>${r1.length} เขต</b> พรรคประชาชนชนะเป็นอันดับที่ 1 → <b>พื้นที่เสี่ยง</b> ที่ต้องรักษาไว้</li>
+        <li><b>${close.length - r1.length} เขต</b> ที่ยังไม่ชนะ (เกือบชนะอันดับ 2 จำนวน ${r2.length} เขต) → <b>พื้นที่เป้าหมาย</b> ที่ต้องเก็บเพิ่ม</li></ul>
+        <p style="font-size:13.5px">กดสลับ "พื้นที่เป้าหมาย / พื้นที่เสี่ยง" ใต้แผนที่ · เป้าหมายยิ่งเข้มยิ่งใกล้ชนะ · เสี่ยงยิ่งแดงเข้มยิ่งเสี่ยงเสียเขต</p>
+        <div class="note">สูสี = อันดับ 1 ต่างจากอันดับ 2 < 5% · ปุ่ม "ผู้ไม่มาใช้สิทธิสูง" กรองเขตที่สูงกว่าค่าเฉลี่ย (${NV_AVG.toFixed(1)}%)</div>`,
+      run() { gMap(); } },
+    { part: 'Part 2', n: 'ข้อ 12', head: 'เทรนของคนเลือกส้มเป็นอย่างไร → สัดส่วนประชากรเทศบาล × GPP → เอาขวาบน', title: 'เมืองใหญ่ + GPP สูง = กลุ่มเป้าหมายของส้ม', mode: 'panel',
+      html: `<p>กลุ่มคนที่เลือกพรรคประชาชนมีลักษณะแบบไหน? ถ้าพิจารณาจาก <b>การอยู่ในเขตเทศบาล</b> และ <b>GPP</b> จะเห็นได้ว่ากลุ่มที่อยู่ในเขตเทศบาลและมี GPP สูงเป็นกลุ่มคนที่เลือกพรรคประชาชน</p>
+        <p>จังหวัดที่มีลักษณะใกล้เคียงกันอาจเป็นกลุ่มเป้าหมายที่โน้มน้าวได้ เช่น <b>${H_PICK.join(', ')}</b></p>`,
+      run() { scatterPanel('urb', 'สัดส่วนประชากรในเขตเทศบาล (%)', H_PICK); } },
+    { part: 'Part 2', n: 'ข้อ 13', head: 'เทรนของคนเลือกส้มเป็นอย่างไร → มาตรฐานความเป็นอยู่ × GPP → เอาขวาบน', title: 'คุณภาพชีวิตสูง + GPP สูง = กลุ่มเป้าหมายของส้ม', mode: 'panel',
+      html: `<p>ถ้าพิจารณาจาก <b>มาตรฐานความเป็นอยู่</b> และ <b>GPP</b> จังหวัดที่อยู่ขวาบนของกราฟ และมีลักษณะใกล้เคียงกับกลุ่มที่เลือกพรรคประชาชน อาจเป็นกลุ่มเป้าหมายที่โน้มน้าวได้ เช่น <b>${I_PICK.join(', ')}</b></p>`,
+      run() { scatterPanel('qol', 'ดัชนีคุณภาพชีวิต', I_PICK); } },
+    { part: 'Part 2', n: 'ข้อ 14', head: 'แล้วจังหวัดที่ได้มา เราจะโฟกัสที่เขตไหน → เขตที่สูสี', title: 'เขตที่พรรคประชาชนควรให้ความสำคัญสูงสุด', mode: 'map',
+      html: `<p>เมื่อนำจังหวัดข้างต้นมาพิจารณาเพิ่มเติมด้วยเขตที่ผลคะแนนสูสี และกลุ่มคนที่ไม่ได้มาออกเสียง จะพบว่าเป็นกลุ่มที่พรรคประชาชนควรให้ความสำคัญสูงสุดเพื่อเพิ่มฐานเสียง</p>
+        <table class="mini"><thead><tr><th>เขต</th><th>ห่างผู้ชนะ</th><th>ไม่มาใช้สิทธิ</th></tr></thead><tbody>${J.map(z => `<tr><td><b>${z.prov} เขต ${z.zone}</b></td><td>${z.margin.toFixed(1)}%</td><td>${z.nv.toFixed(1)}%</td></tr>`).join('')}</tbody></table>
+        <div class="note">ค่าเฉลี่ยผู้ไม่มาใช้สิทธิทั่วประเทศ ${NV_AVG.toFixed(1)}%</div>`,
+      run() { const set = new Set(J.map(z => z.key)); mapS.paint({ fill: z => z.w69, show: z => set.has(z.key), ring: z => set.has(z.key), faded: .16, color: z => set.has(z.key) ? colorOf(z.w69) : GREY_L }); legend(top(count(J, z => z.w69)), 'เขตลำดับความสำคัญ (สีตามผู้ชนะ · กรอบดำ = โฟกัส)'); } },
+    { part: 'Part 3', n: 'ข้อ 15–16', head: 'พรรครัฐบาลเกี่ยวข้องกับธุรกิจไรบ้าง', title: 'ธุรกิจของนักการเมือง (กำลังจัดทำ)', mode: 'map',
+      html: `<p><b>สมมติฐาน:</b> ส.ส. น่าจะสร้างผลประโยชน์ให้แก่ธุรกิจที่ตัวเองมีความเกี่ยวข้อง</p>
+        <div class="soon">ข้อสรุป "ธุรกิจ xx มีความเชื่อมโยงกับนักการเมืองมากที่สุด และเชื่อมโยงกับหุ้น PTT และ DOD Biotech PCL" ยังรอข้อมูล</div>
+        <a class="btn" href="cabinet2569-business.html">ดูข้อมูลความเกี่ยวข้องกับธุรกิจ →</a>`,
+      run() { mapS.paint({ fill: z => z.w69, show: () => false, faded: .5 }); legend([], 'ข้อมูลส่วนนี้อยู่ในหน้า mp-business.html'); } },
+  ];
+  S.forEach((s, i) => { s.no = s.part; });
+
+  // ข้อ 11: สลับพื้นที่เป้าหมาย / พื้นที่เสี่ยง (เหมือน index) + กรองผู้ไม่มาใช้สิทธิ
+  const gSt = { view: 'attack', hide: true, high: false };
+  const RED_LOW = '#FED7D7', RED_HIGH = '#C53030';
+  function gMap() {
+    const { view, hide, high } = gSt, atk = view === 'attack';
+    const gScale = d3.scaleLinear([0, 1], ['#FFFFFF', ORANGE]).interpolate(d3.interpolateRgb);
+    const redScale = d3.interpolateRgb(RED_LOW, RED_HIGH), cl = v => Math.max(0, Math.min(1, v));
+    const rel = z => z.margin < 5 && (!high || z.nv >= NV_AVG) && (atk ? z.prank !== 1 : z.prank === 1);
+    const inScope = z => z.margin < 5 && (!high || z.nv >= NV_AVG);
+    const show = z => hide ? rel(z) : inScope(z);
+    const color = z => atk
+      ? (z.prank === 1 ? ORANGE : gScale(cl(1 - (z.xs == null ? 12 : z.xs) / 12)))
+      : (z.prank === 1 ? redScale(Math.pow(cl(1 + z.xs / 12), 1.2)) : '#E5E7EB');
+    mapS.paint({ fill: z => z.w69, show, faded: .12, mark: z => atk && z.prank === 1, color });
+    const sub = high ? ` · ผู้ไม่มาใช้สิทธิ ≥ ${NV_AVG.toFixed(1)}%` : '';
+    d3.select('#legend').html(atk
+      ? `<div class="cap">พื้นที่เป้าหมาย (เขตสูสีที่ยังไม่ชนะ)${sub}</div><span style="--c:${ORANGE}">ชนะแล้ว ◥</span>
+         <span style="display:inline-flex;align-items:center;gap:6px">ต้องเพิ่มส่วนแบ่ง <span style="display:inline-block;width:90px;height:10px;border-radius:3px;border:1px solid #CBD5E0;background:linear-gradient(90deg,${ORANGE},#fff)"></span> 12+ จุด</span>`
+      : `<div class="cap">พื้นที่เสี่ยง (เขตสูสีที่ชนะอยู่)${sub}</div>
+         <span style="display:inline-flex;align-items:center;gap:6px">ความเสี่ยงต่ำ <span style="display:inline-block;width:90px;height:10px;border-radius:3px;border:1px solid #CBD5E0;background:linear-gradient(90deg,${RED_LOW},${RED_HIGH})"></span> สูง (กันชน 0 จุด)</span>`);
+    d3.select('#ctl').html(`<div style="width:100%;display:flex;gap:6px;justify-content:center">
+        <button class="${atk ? 'on' : ''}" data-v="attack">พื้นที่เป้าหมาย (${close.filter(z => z.prank !== 1).length})</button><button class="${atk ? '' : 'on'}" data-v="defend">พื้นที่เสี่ยง (${r1.length})</button></div>
+      <label style="font-size:12px;color:#475569;cursor:pointer"><input type="checkbox" id="gHide" ${hide ? 'checked' : ''}> ซ่อนเขตที่ไม่เกี่ยวข้อง (${atk ? 'เขตที่ชนะ' : 'เขตที่แพ้'})</label>
+      <button class="${high ? 'on' : ''}" data-h="1">ผู้ไม่มาใช้สิทธิสูง (${close.filter(z => z.nv >= NV_AVG).length})</button>`);
+    d3.selectAll('#ctl button[data-v]').on('click', function () { gSt.view = this.dataset.v; gMap(); });
+    d3.select('#gHide').on('change', function () { gSt.hide = this.checked; gMap(); });
+    d3.select('#ctl button[data-h]').on('click', () => { gSt.high = !gSt.high; gMap(); });
+  }
+
+  // ---------- หน้าปกและหน้าสรุป ----------
+  const cover = { cover: true, head: 'บทวิเคราะห์การเลือกตั้ง 2569', no: 'แผนที่เล่าเรื่อง', title: 'เลือกตั้ง 2569 เล่าผ่านแผนที่ 400 เขต', mode: 'map',
+    html: `<p>ใครชนะ ชนะที่ไหน เพราะอะไร และถ้าเป็นพรรคส้มจะสู้ที่ไหน — กด "ถัดไป" เพื่อดูภาพเปลี่ยนไปทีละตอน แล้วค่อยไปสำรวจเขตของคุณเองในเครื่องมือเต็ม</p><p style="font-size:13px;opacity:.8">${S.length} ตอน</p><button class="btn" id="startbtn">เริ่มเลย →</button>`,
+    run() { mapS.paint({ fill: z => z.w69, show: () => false, faded: .5 }); legend([], 'แผนที่ 400 เขตเลือกตั้ง'); } };
+  const finale = { head: 'ต่อยอดสู่การสำรวจ', no: 'จบการเล่าเรื่อง', title: 'อยากดูเขตของคุณเอง?', mode: 'map',
+    html: `<p>เครื่องมือเต็มให้ค้นหาเขต กรองตามจังหวัด ภูมิภาค ระดับเศรษฐกิจ และดูแนวทางกลยุทธ์ของแต่ละพรรครายเขต</p><a class="btn" href="index.html">เปิดแผนที่สำรวจเต็ม →</a>`,
+    run() { mapS.paint({ fill: z => z.w69 }); legend(top(seats69), 'ผลแบ่งเขต ปี 2569'); } };
+  const deckSlides = [cover, ...S, finale], T = deckSlides.length;
+
+  const wrap = d3.select('#cardwrap'), dotsEl = d3.select('#dots');
+  dotsEl.selectAll('button').data(deckSlides).enter().append('button').attr('class', 'dot').attr('aria-label', (d, i) => `ไปหน้า ${i + 1}`).on('click', (e, d) => go(deckSlides.indexOf(d)));
+  let cur = -1, swapT = null;
+  function show(i) {
+    const sc = deckSlides[i];
+    wrap.html(`<div class="topic">${sc.head || ''}</div><div class="card${sc.cover ? ' cover' : ''}"><div class="no">${sc.no}</div><h2>${sc.title}</h2>${sc.html}</div>`);
+    const sb = document.getElementById('startbtn'); if (sb) sb.onclick = () => go(1);
+    wrap.classed('out', false);
+  }
+  function setMode(m) {
+    d3.select('#mapS').classed('show', m === 'map'); d3.select('#mapD').classed('show', m === 'dual'); d3.select('#panel').classed('show', m === 'panel');
+  }
+  function go(i, fromHash) {
+    i = Math.max(0, Math.min(T - 1, i)); if (i === cur) return;
+    const first = cur < 0; cur = i; const sc = deckSlides[i];
+    clearTimeout(swapT);
+    if (first) show(i); else { wrap.classed('out', true); swapT = setTimeout(() => show(i), 220); }
+    dotsEl.selectAll('.dot').classed('on', (_, k) => k === i);
+    d3.select('#prev').property('disabled', i === 0);
+    d3.select('#next').property('disabled', i === T - 1).style('visibility', i === T - 1 ? 'hidden' : 'visible');
+    d3.select('#prog').style('width', (i / (T - 1) * 100) + '%');
+    d3.select('#ctl').html('');
+    if (sc.dm) { d3.select('#dmLt').text(sc.dm[0]); d3.select('#dmRt').text(sc.dm[1]); }
+    setMode(sc.mode || 'map'); sc.run();
+    if (!fromHash) { try { history.replaceState(null, '', i === 0 ? location.pathname : '#' + i); } catch (e) {} }
+  }
+  d3.select('#next').on('click', () => go(cur + 1)); d3.select('#prev').on('click', () => go(cur - 1));
+  addEventListener('keydown', e => {
+    if (e.target.closest && e.target.closest('a,input,select,textarea,button.dot')) return;
+    if (['ArrowRight', 'ArrowDown', 'PageDown'].includes(e.key) || (e.key === ' ' && !(e.target.closest && e.target.closest('button')))) { e.preventDefault(); go(cur + 1); }
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+    else if (e.key === 'Home') go(0); else if (e.key === 'End') go(T - 1);
+  });
+  let tx = null, ty = null;
+  addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchend', e => { if (tx === null) return; const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(cur + (dx < 0 ? 1 : -1)); }, { passive: true });
+  const fromHash = () => { const n = parseInt((location.hash || '').slice(1)); return isNaN(n) ? 0 : n; };
+  addEventListener('hashchange', () => go(fromHash(), true));
+  go(fromHash(), true);
+  window.__go = go;
+  window.__story = { N, T69: T69.filter(r => r.tot > 3), T66: T66.filter(r => r.tot > 3), close: close.length, r1: r1.length, r2: r2.length, nSw, sw1, sw2, J: J.map(z => [z.prov, z.zone, +z.margin.toFixed(1), z.nv]), provs: provs.length, slides: T };
+});
+</script>
+</body></html>
