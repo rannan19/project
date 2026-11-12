@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>จับขั้วรัฐบาล</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap">
+<style>
+
+/* Layout: two white panels (รัฐบาล | ฝ่ายค้าน) under slate title bars, facing each other across a VS medallion; unassigned parties wrap in a tray below.
+   Look follows the reference map: warm paper ground, slate bars, teal accent, flat saturated party colours, heavy rounded Thai type. */
+:root {
+  --bg: #f7f4ee;
+  --panel: #ffffff;
+  --slate: #2D3748;
+  --teal: #4E9A93;
+  --line: #d9d3c7;
+  --fg: #2b2f3a;
+  --muted: #6f7482;
+  --slot: #efebe3;
+  --font-display: "Kanit", system-ui, sans-serif;
+  --font-body: "Kanit", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body);
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  -webkit-user-select: none; user-select: none;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 5vw, 38px); margin: 0; text-wrap: balance; color: var(--slate); }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.tools { display: flex; gap: 8px; }
+button.tool {
+  font: 600 14px var(--font-body); color: var(--slate); background: #fff;
+  border: 1.5px solid var(--slate); border-radius: 10px; padding: 9px 16px; cursor: pointer;
+}
+button.tool.primary { background: var(--teal); border-color: var(--teal); color: #fff; }
+button.tool:hover { filter: brightness(.95); }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.stage { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: start; }
+.vs { margin-top: 150px; width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; font: 700 15px var(--font-display); color: #fff; background: var(--slate); box-shadow: 0 0 0 4px var(--bg), 0 0 0 5.5px var(--slate); }
+
+.side { min-width: 0; background: var(--panel); border-radius: 16px; box-shadow: 0 2px 14px rgba(47,58,79,.10); overflow: hidden; display: grid; align-content: start; }
+.score { display: grid; gap: 8px; padding: 12px 16px 14px; background: var(--slate); color: #fff; }
+.score-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.score-name { font: 700 18px var(--font-display); }
+.score-num { font: 700 32px var(--font-display); font-variant-numeric: tabular-nums; line-height: 1; }
+.score-num small { font: 500 14px var(--font-body); opacity: .75; margin-left: 4px; }
+.meter { position: relative; height: 8px; border-radius: 99px; background: rgba(255,255,255,.18); }
+.meter i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; transition: width .35s ease; background: #7fc9c1; }
+.meter b { position: absolute; left: 50.2%; top: -4px; bottom: -4px; width: 2px; background: #fff; }
+.meter-note { display: flex; justify-content: space-between; font-size: 12px; opacity: .85; min-height: 18px; }
+.win { color: #9be3da; font-weight: 600; opacity: 1; }
+
+.zone { padding: 14px; border: 2px dashed transparent; border-radius: 12px; margin: 4px; transition: background .15s, border-color .15s; }
+.zone.over { background: #e6f2f0; border-color: var(--teal); }
+.thrones { display: grid; grid-template-columns: 1fr 1.18fr 1fr; gap: 8px; align-items: center; }
+.slot-big { aspect-ratio: 3 / 4.4; min-width: 0; }
+.slot-big.c { aspect-ratio: 3 / 5.2; }
+.minis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
+.slot-mini { aspect-ratio: 1; min-width: 0; }
+
+.throne { width: 100%; height: 100%; border-radius: 10px; border: 1.5px dashed var(--line); background: var(--slot); display: grid; place-items: center; }
+.throne svg { width: 50%; height: auto; stroke: #b9b2a3; fill: none; stroke-width: 1.8; }
+.slot-mini .throne svg { width: 58%; }
+
+.card {
+  --c: #888; position: relative; width: 100%; height: 100%; min-width: 0;
+  border-radius: 10px; overflow: hidden; cursor: grab; touch-action: none;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: var(--c); color: #fff; text-align: center;
+  box-shadow: 0 2px 6px rgba(47,58,79,.25);
+}
+.card:active { cursor: grabbing; }
+.card.dragging { opacity: .25; }
+.emb { display: grid; place-items: center; border-radius: 50%; background: #fff; color: var(--c); font-family: var(--font-display); font-weight: 700; }
+.card .emb { position: absolute; left: 50%; top: 48%; transform: translate(-50%, -50%); width: 84%; aspect-ratio: 1; font-size: clamp(40px, 7vw, 76px); }
+.card .nm { position: absolute; top: 8px; left: 4px; right: 4px; font: 600 clamp(10.5px, 1.5vw, 14px)/1.2 var(--font-display); overflow-wrap: normal; word-break: keep-all; text-align: center; }
+.card .seat { background: rgba(0,0,0,.22); padding: 6px 4px 7px; font: 700 clamp(20px, 3.4vw, 30px)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.card .seat small { font: 500 11px var(--font-body); margin-left: 3px; opacity: .85; }
+
+.card .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; pointer-events: none; }
+.emb img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; object-position: 50% 12%; pointer-events: none; }
+.card.has-img .emb { top: 8px; left: 8px; transform: none; width: 38px; height: 38px; font-size: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.card.has-img .nm { top: auto; bottom: 0; left: 0; right: 0; padding: 22px 6px 6px; background: linear-gradient(transparent, rgba(0,0,0,.65)); position: relative; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.card.has-img .seat { position: relative; }
+.tray .card.has-img .emb { top: 6px; width: 24px; font-size: 13px; }
+
+.emb.logo { border: 2px solid #fff; background: #fff; }
+.emb.logo img { object-position: 50% 50%; }
+.emb.logo img { object-fit: contain; object-position: 50% 50%; background: #fff; padding: 7%; }
+.card.mini { justify-content: center; align-items: center; gap: 1px; padding: 2px; }
+.card.mini .emb { position: static; transform: none; width: 72%; font-size: clamp(18px, 3vw, 28px); }
+.card.mini .seat { background: none; padding: 0; font-size: clamp(11px, 1.9vw, 15px); }
+.card.mini .seat small, .card.mini .nm { display: none; }
+
+.trayhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.tray-title { font: 700 16px var(--font-display); color: var(--slate); }
+.tray-hint { color: var(--muted); font-size: 13px; }
+.tray { background: var(--panel); border-radius: 16px; box-shadow: 0 2px 14px rgba(47,58,79,.10); border: 2px dashed transparent; padding: 14px; min-height: 120px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; transition: background .15s, border-color .15s; }
+.tray .cell { aspect-ratio: 3 / 4; min-width: 0; }
+.tray .card .nm { top: 6px; font-size: 11px; }
+.tray .card .emb { top: 47%; width: 66%; font-size: 34px; }
+.tray .card .seat { font-size: 18px; }
+.empty { grid-column: 1 / -1; align-self: center; text-align: center; color: var(--muted); font-size: 14px; }
+.tray.over { border-color: var(--teal); background: #e6f2f0; }
+
+.ghost { position: fixed; z-index: 50; pointer-events: none; transform: translate(-50%, -60%) rotate(-3deg); box-shadow: 0 14px 30px rgba(47,58,79,.4); border-radius: 10px; }
+.ghost .card { cursor: grabbing; }
+.foot { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: 1fr; }
+  .vs { margin: 0; justify-self: center; width: 42px; height: 42px; font-size: 13px; }
+  .zone { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .meter i, .zone, .tray { transition: none; } }
+
+
+[hidden]{display:none!important}
+button.tool.cf[aria-pressed="true"]{background:var(--slate);color:#fff}
+.tools{flex-wrap:wrap}
+.cfbar{background:#fff7e6;border:1.5px solid #e9c46a;border-radius:12px;padding:10px 14px;font-size:14px;color:#5a4300;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.cfbar b{font-weight:600}
+.card .mv{display:block;width:max-content;margin:5px auto 0;background:rgba(255,255,255,.92);color:var(--slate);font:600 10.5px/1.2 var(--font-body);padding:2px 7px;border-radius:99px;white-space:nowrap}
+.card .mv.dn{background:#2D3748;color:#fff}
+
+.card.mini .mv{display:none}
+.depend{display:flex;gap:8px;align-items:center;font-size:12.5px;opacity:.95;flex-wrap:wrap}
+.depend .bar{flex:1 1 80px;height:6px;border-radius:99px;background:rgba(255,255,255,.18);position:relative;overflow:hidden;min-width:60px}
+.depend .bar i{position:absolute;inset:0 auto 0 0;background:#f2c14e;border-radius:99px}
+.movers{background:var(--panel);border-radius:16px;box-shadow:0 2px 14px rgba(47,58,79,.10);padding:4px 16px}
+.movers summary{cursor:pointer;font:700 16px var(--font-display);color:var(--slate);padding:10px 0;list-style-position:inside}
+.mvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px 22px;padding:4px 0 14px}
+.mvgrp h4{margin:0 0 6px;font:700 14px var(--font-display);display:flex;gap:8px;align-items:center}
+.mvgrp h4 i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.mvgrp ul{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-size:13px}
+.mvgrp li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dotted var(--line);padding-bottom:2px}
+.mvgrp li span{color:var(--muted);white-space:nowrap}
+.mvsum{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);padding-bottom:6px}
+/* card layout: name / logo / seats stacked, logo centred in the space between */
+.card:not(.mini):not(.has-img) { justify-content: space-between; align-items: center; }
+.card:not(.mini):not(.has-img) .nm { position: static; padding: 8px 4px 0; width: 100%; flex: none; }
+.card .embwrap { flex: 1 1 0; min-height: 0; width: 100%; display: grid; place-items: center; container-type: size; padding: 6px 0; }
+.card .embwrap .emb { position: static; transform: none; width: min(84cqw, 100cqh); height: min(84cqw, 100cqh); aspect-ratio: auto; }
+.card:not(.mini):not(.has-img) .seat { align-self: stretch; flex: none; }
+.tray .card .embwrap .emb { width: min(76cqw, 100cqh); height: min(76cqw, 100cqh); }
+.card.has-img .emb { position: absolute; }
+/* equal logo size: fixed-height single-line seat bar, chip inline */
+.card:not(.mini) .seat { display: flex; align-items: center; justify-content: center; gap: 2px 5px; flex-wrap: nowrap; height: 44px; padding: 0 4px; white-space: nowrap; font-size: clamp(18px, 2.6vw, 26px); }
+.card:not(.mini) .seat small { margin-left: 1px; }
+.card:not(.mini) .seat .mv { margin: 0 0 0 3px; display: inline-block; font-size: 10px; padding: 2px 6px; }
+.tray .card:not(.mini) .seat { height: 34px; font-size: 15px; gap: 2px; padding: 0 2px; }
+.tray .card:not(.mini) .seat:has(.mv) small { display: none; }
+.tray .card:not(.mini) .seat small { font-size: 10px; }
+.tray .card:not(.mini) .seat .mv { font-size: 9px; padding: 1px 5px; margin-left: 1px; }
+.throne { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(180deg, #f3efe7, #ece6da); border: 1.5px dashed #d8d0c0; transition: background .2s, border-color .2s; }
+.throne svg { stroke: none !important; fill: none; width: 46%; height: auto; filter: drop-shadow(0 1px 0 rgba(255,255,255,.7)); }
+.slot-big.c .throne svg { width: 52%; }
+.slot-mini .throne svg { width: 60%; }
+.tlabel { font: 500 12px var(--font-body); color: #a79e8b; letter-spacing: .02em; }
+.zone.over .throne { background: #e3f1ef; border-color: var(--teal); }
+.zone.over .throne svg rect, .zone.over .throne svg ellipse { opacity: .8; }
+#fx { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 60; }
+.toast { position: fixed; left: 50%; top: max(18px, env(safe-area-inset-top, 0px)); transform: translate(-50%, -140%); z-index: 61; background: var(--slate); color: #fff; font: 700 18px var(--font-display); padding: 12px 22px; border-radius: 999px; box-shadow: 0 10px 30px rgba(47,58,79,.35); display: flex; gap: 10px; align-items: center; transition: transform .45s cubic-bezier(.2,1.4,.4,1); pointer-events: none; white-space: nowrap; }
+.toast small { font: 500 13px var(--font-body); opacity: .8; }
+.toast { visibility: hidden; opacity: 0; transition: transform .45s cubic-bezier(.2,1.4,.4,1), opacity .3s, visibility 0s .45s; }
+.toast:empty { display: none; }
+.toast.show { transform: translate(-50%, 0); visibility: visible; opacity: 1; transition: transform .45s cubic-bezier(.2,1.4,.4,1), opacity .2s; }
+.toast .dot { width: 12px; height: 12px; border-radius: 50%; background: #9be3da; box-shadow: 0 0 0 4px rgba(155,227,218,.25); }
+.side.gov.won { box-shadow: 0 0 0 3px #7fc9c1, 0 8px 30px rgba(79,154,148,.45); animation: wonpulse 1.6s ease-out 1; }
+.side.gov.won .score { background: linear-gradient(120deg, #2D3748 0%, #2D3748 40%, #3d6b6a 50%, #2D3748 60%, #2D3748 100%); background-size: 250% 100%; animation: shine 1.8s ease-out 1; }
+.side.gov.won .meter i { background: linear-gradient(90deg, #7fc9c1, #f2d27a); }
+@keyframes wonpulse { 0% { transform: scale(1); } 18% { transform: scale(1.015); } 100% { transform: scale(1); } }
+@keyframes shine { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .side.gov.won, .side.gov.won .score { animation: none; } .toast { transition: none; } }
+.mvcount{font:500 13px var(--font-body);color:var(--muted);margin-left:6px}
+.mvcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 36px;padding:4px 0 12px;border-bottom:1px solid var(--line)}
+.mvcols h5{margin:0 0 6px;font:600 12px var(--font-body);color:var(--muted);letter-spacing:.02em}
+.mvrates{display:grid;gap:6px}
+.mvrate.zero b{color:#b4531a}
+.mvrate.few{opacity:.55}
+.mvrates .few:not(.few~.few){margin-top:6px;padding-top:8px;border-top:1px dashed var(--line)}
+.mvnotefew{font-size:11.5px;color:var(--muted);margin-top:4px}
+.mvrate .zt{color:#b4531a;font-weight:600}
+.mvhl{display:block;width:100%;text-align:left;margin:12px 0 0;padding:12px 14px;border:1.5px solid #f3c39f;background:#fdf2ea;border-radius:12px;cursor:pointer;font:inherit;color:var(--ink,#1f2a37)}
+.mvhl:hover,.mvhl[aria-pressed="true"]{border-color:#FF6411;box-shadow:0 0 0 3px rgba(255,100,17,.12)}
+.mvhl .hd{font:700 16px var(--font-display);color:#b4531a}
+.mvhl .sb{font-size:13px;color:var(--muted);margin:2px 0 8px}
+.mvhl .bars{display:grid;gap:4px}
+.mvhl .br{display:grid;grid-template-columns:220px 1fr 120px;gap:8px;align-items:center;font-size:12px}
+.mvhl .br>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mvhl .tr{position:relative;height:9px;border-radius:99px;background:#f6dcc8}
+.mvhl .tr i{position:absolute;inset:0 auto 0 0;border-radius:99px;background:#FF6411;min-width:3px}
+.mvhl .br>span:last-child{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.mvhl .cta{font-size:12px;color:#b4531a;margin-top:8px;font-weight:600}
+@media (max-width:560px){.mvhl .br{grid-template-columns:96px 1fr 92px}.mvhl .br>span:last-child{font-size:11px}}
+.mvrate{display:grid;grid-template-columns:112px 1fr 118px;gap:8px;align-items:center;font-size:13px}
+.mvrate b{font-weight:600;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mvrate .rb{height:10px;border-radius:99px;background:var(--slot);position:relative;overflow:hidden}
+.mvrate .rb i{position:absolute;inset:0 auto 0 0;border-radius:99px}
+.mvrate span{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mvtabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:12px 0 8px}
+.mvtabs button{font:600 14px var(--font-body);border:1.5px solid var(--slate);background:#fff;color:var(--slate);border-radius:999px;padding:5px 16px;cursor:pointer}
+.mvtabs button[aria-selected="true"]{background:var(--slate);color:#fff}
+.mvnote{font-size:13px;color:var(--muted);margin-left:6px}
+.mvgrp li{display:block;padding:3px 0 4px}
+.mvgrp li>.nmv{font-weight:500;color:var(--ink,#1f2a37)}
+.mvgrp li>.dt{display:block;white-space:normal;font-size:12px;line-height:1.5}
+.mvgrp li>.dt span{white-space:nowrap}
+.mvgrp li .vt{font-variant-numeric:tabular-nums}
+.mvgrp li .up{color:#2f7a5f}.mvgrp li .dn{color:#b0413e}
+.lost{display:inline-block;font:600 10.5px var(--font-body);background:#fbe3e1;color:#9b2c2c;border-radius:99px;padding:1px 7px;margin-left:4px}
+.rk{font-weight:600;color:var(--slate)}
+.to-map{position:absolute;top:12px;right:16px;z-index:30;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;background:#fff;color:#2D3748;border:1px solid #cbd5e1;font:500 13px/1.2 inherit;font-family:inherit;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.08);white-space:nowrap}.to-map:hover{background:#2D3748;color:#fff;border-color:#2D3748}.to-map:focus-visible{outline:2px solid #2D3748;outline-offset:2px}
+body{padding-top:22px}
+</style>
+</head>
+<body>
+<a class="to-map" href="index.html">← กลับไปแผนที่</a>
+
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>จับขั้วรัฐบาล</h1>
+      <p class="sub">ผลเลือกตั้ง 2569 · สส. 500 ที่นั่ง · ต้องมี 251 เสียงขึ้นไปจึงเป็นเสียงข้างมาก</p>
+    </div>
+    <div class="tools">
+      <button class="tool primary" id="flip" type="button">⇄ พลิกขั้ว</button>
+      <button class="tool cf" id="cf" type="button" aria-pressed="false" title="สมมติว่า สส. เขตปี 2566 ที่ย้ายพรรคแล้วชนะ 68 คน ลงในนามพรรคเดิม">↶ ถ้านับตามพรรคเดิมปี 2566</button>
+      <button class="tool" id="reset" type="button">↺ เริ่มใหม่</button>
+    </div>
+  </header>
+
+  <div class="cfbar" id="cfbar" hidden><b>กำลังดูแบบสมมติ:</b> สส. เขตปี 2566 จำนวน 68 คนที่ย้ายพรรคแล้วชนะในปี 2569 ถูกนับให้พรรคเดิมปี 2566 (ไม่ใช่ผลจริง และไม่ได้หมายความว่าจะชนะถ้าอยู่พรรคเดิม) · การ์ดที่ที่นั่งเปลี่ยนแสดงผลจริงไว้มุมขวาบน</div>
+
+  <section class="stage" aria-label="จับขั้วรัฐบาล">
+    <div class="side gov" id="gov"></div>
+    <div class="vs">VS</div>
+    <div class="side opp" id="opp"></div>
+  </section>
+
+  <section>
+    <div class="trayhead">
+      <span class="tray-title">ยังไม่มีฝ่าย <span id="poolCount"></span></span>
+      <span class="tray-hint">ลากการ์ดพรรคไปวางฝั่งที่ต้องการ หรือโฟกัสแล้วกด G (รัฐบาล) / O (ฝ่ายค้าน) / P (ยังไม่มีฝ่าย)</span>
+    </div>
+    <div class="tray" id="pool" data-zone="pool"></div>
+  </section>
+  <details class="movers" id="movers"><summary>สส. เขตปี 2566 ที่ย้ายพรรคไปลงปี 2569 <span class="mvcount">106 คน · ชนะ 68 · แพ้ 38</span></summary>
+    <div class="mvcols"><div><h5>แยกตามพรรคที่ย้ายไป</h5><div class="mvrates" id="mvrates"></div></div><div><h5>แยกตามพรรคเดิมปี 2566</h5><div class="mvrates" id="mvrates2"></div></div></div><div class="mvnotefew">แถบจางด้านล่าง = ย้ายน้อยกว่า 3 คน จำนวนน้อยเกินกว่าจะสรุปเป็นอัตรา</div>
+    <button type="button" class="mvhl" id="mvhl"></button>
+    <div class="mvtabs" role="tablist" aria-label="ผลการเลือกตั้งของ สส. ที่ย้ายพรรค"><button type="button" role="tab" id="tab-win" data-t="win" aria-selected="true">ชนะ 68</button><button type="button" role="tab" id="tab-lose" data-t="lose" aria-selected="false">แพ้ 38</button><span class="mvnote" id="mvnote"></span></div>
+    <div class="mvsum" id="mvsum"></div><div class="mvgrid" id="mvgrid" role="tabpanel"></div></details>
+  <p class="foot">จำนวน สส. จากคอลัมน์ Grand Total (แบ่งเขต + บัญชีรายชื่อ) ของไฟล์ Count_69-Real.csv · รายชื่อ สส. ย้ายพรรคจากไฟล์ สส.66 ที่ย้ายพรรคในปี 2569 (สส. เขต) ปุ่มนับตามพรรคเดิมใช้เฉพาะ 68 คนที่ชนะ · ผู้ชนะในเขตที่แพ้จาก election_result-con_69.csv · ก้าวไกลนับเป็นประชาชน และชาติพัฒนากล้านับเป็นชาติพัฒนา · โลโก้พรรคจากเว็บรายงานผลการเลือกตั้งของ กกต. (ectreport69.ect.go.th)</p>
+</div>
+
+<script>
+const DATA = [
+  ["เพื่อไทย",74],["เพื่อชาติไทย",2],["เศรษฐกิจ",3],["เสรีรวมไทย",1],["ใหม่",1],["ไทยทรัพย์ทวี",1],["ไทยภักดี",1],
+  ["ไทยสร้างไทย",2],["ไทรวมพลัง",6],["กล้าธรรม",58],["ทางเลือกใหม่",1],["ประชาชน",120],["ประชาชาติ",5],
+  ["ประชาธิปไตยใหม่",1],["ประชาธิปัตย์",21],["พลังประชารัฐ",5],["ภูมิใจไทย",192],["มิติใหม่",1],["รวมใจไทย",1],
+  ["รวมไทยสร้างชาติ",2],["รวมพลังประชาชน",1],["โอกาสใหม่",1]
+];
+const COLORS = {
+  "ภูมิใจไทย":"#322485","ประชาชน":"#FF6411","เพื่อไทย":"#D60003","กล้าธรรม":"#48CB74","ประชาธิปัตย์":"#01A4E4",
+  "ไทรวมพลัง":"#FD318C","ประชาชาติ":"#A46D06","พลังประชารัฐ":"#086A3B","เศรษฐกิจ":"#FFBE3E","เพื่อชาติไทย":"#d9607a",
+  "รวมไทยสร้างชาติ":"#272D80","ไทยสร้างไทย":"#5A0F9D"
+};
+const ALLMV = [["นายจำลอง ภูนวนทา", "พลังประชารัฐ", "กล้าธรรม", "กาฬสินธุ์", "3", 37044, 27385, "ชนะ", ""], ["นายไผ่ ลิกค์", "พลังประชารัฐ", "กล้าธรรม", "กำแพงเพชร", "1", 36187, 45347, "ชนะ", ""], ["นายเพชรภูมิ อาภรณ์รัตน์", "พลังประชารัฐ", "กล้าธรรม", "กำแพงเพชร", "2", 41143, 42302, "ชนะ", ""], ["นายปริญญา ฤกษ์หร่าย", "พลังประชารัฐ", "กล้าธรรม", "กำแพงเพชร", "4", 36132, 27423, "อันดับ 2", "เพื่อไทย"], ["นายอรรถกร ศิริลัทธยากร", "พลังประชารัฐ", "กล้าธรรม", "ฉะเชิงเทรา", "2", 42777, 50833, "ชนะ", ""], ["นางสาวกฤษฏิ์ ชีวะธรรมานนท์", "ก้าวไกล", "กล้าธรรม", "ชลบุรี", "6", 37572, 910, "อันดับ 7", "ประชาชน"], ["นายสะถิระ เผือกประพันธุ์", "พลังประชารัฐ", "กล้าธรรม", "ชลบุรี", "10", 27461, 23062, "อันดับ 3", "ประชาชน"], ["นางสาวกาญจนา จังหวะ", "พลังประชารัฐ", "กล้าธรรม", "ชัยภูมิ", "4", 21432, 17314, "อันดับ 2", "ภูมิใจไทย"], ["นายอัครแสนคีรี โล่ห์วีระ", "พลังประชารัฐ", "กล้าธรรม", "ชัยภูมิ", "7", 38498, 40833, "ชนะ", ""], ["นายสันต์ แซ่ตั้ง", "รวมไทยสร้างชาติ", "กล้าธรรม", "ชุมพร", "2", 32500, 23041, "อันดับ 2", "ภูมิใจไทย"], ["นายภาคภูมิ บูลย์ประมุข", "พลังประชารัฐ", "กล้าธรรม", "ตาก", "3", 31550, 30644, "ชนะ", ""], ["พันโทสินธพ แก้วพิจิตร", "รวมไทยสร้างชาติ", "กล้าธรรม", "นครปฐม", "2", 33770, 44487, "ชนะ", ""], ["ว่าที่ร้อยโทยุทธการ รัตนมาศ", "ประชาธิปัตย์", "กล้าธรรม", "นครศรีธรรมราช", "4", 22394, 36790, "อันดับ 2", "ประชาธิปัตย์"], ["นายสัญญา นิลสุพรรณ", "รวมไทยสร้างชาติ", "กล้าธรรม", "นครสวรรค์", "3", 32100, 53454, "ชนะ", ""], ["นายคุณากร มั่นนทีรัย", "ก้าวไกล", "กล้าธรรม", "นนทบุรี", "6", 48169, 823, "อันดับ 8", "ประชาชน"], ["นายอามินทร์ มะยูโซ๊ะ", "พลังประชารัฐ", "กล้าธรรม", "นราธิวาส", "2", 31289, 43594, "ชนะ", ""], ["นายสัมพันธ์ มะยูโซ๊ะ", "พลังประชารัฐ", "กล้าธรรม", "นราธิวาส", "3", 34411, 36480, "ชนะ", ""], ["นายจักพันธ์ ปิยพรไพบูลย์", "ประชาธิปัตย์", "กล้าธรรม", "ประจวบคีรีขันธ์", "2", 42736, 43420, "ชนะ", ""], ["นายประมวล พงศ์ถาวราเดช", "ประชาธิปัตย์", "กล้าธรรม", "ประจวบคีรีขันธ์", "3", 23215, 25444, "อันดับ 2", "ภูมิใจไทย"], ["นายยูนัยดี วาบา", "ประชาธิปัตย์", "กล้าธรรม", "ปัตตานี", "4", 21556, 30170, "ชนะ", ""], ["นายอนุรัตน์ ตันบรรจง", "พลังประชารัฐ", "กล้าธรรม", "พะเยา", "2", 32779, 55400, "ชนะ", ""], ["นายจีรเดช ศรีวิราช", "พลังประชารัฐ", "กล้าธรรม", "พะเยา", "3", 34720, 59470, "ชนะ", ""], ["นางสุพัชรี ธรรมเพชร", "ประชาธิปัตย์", "กล้าธรรม", "พัทลุง", "1", 49471, 39873, "อันดับ 2", "ภูมิใจไทย"], ["นางบุญยิ่ง นิติกาญจนา", "พลังประชารัฐ", "กล้าธรรม", "ราชบุรี", "2", 41807, 43510, "ชนะ", ""], ["นายจตุพร กมลพันธ์ทิพย์", "พลังประชารัฐ", "กล้าธรรม", "ราชบุรี", "3", 49262, 51702, "ชนะ", ""], ["นายชัยทิพย์ กมลพันธ์ทิพย์", "พลังประชารัฐ", "กล้าธรรม", "ราชบุรี", "5", 44253, 39913, "อันดับ 2", "ภูมิใจไทย"], ["นางรัชนี พลซื่อ", "พลังประชารัฐ", "กล้าธรรม", "ร้อยเอ็ด", "3", 39181, 35999, "ชนะ", ""], ["นายภูมินทร์ ลีธีระประเสริฐ", "เพื่อไทย", "กล้าธรรม", "ศรีสะเกษ", "4", 38410, 20190, "อันดับ 2", "ภูมิใจไทย"], ["นางนุชนาถ จารุวงษ์เสถียร", "เพื่อไทย", "กล้าธรรม", "ศรีสะเกษ", "9", 38051, 12281, "อันดับ 4", "ภูมิใจไทย"], ["นายชาตรี หล้าพรหม", "ประชาธิปัตย์", "กล้าธรรม", "สกลนคร", "2", 27406, 25737, "ชนะ", ""], ["นายชนนพัฒฐ์ นาคสั้ว", "พลังประชารัฐ", "กล้าธรรม", "สงขลา", "4", 35289, 45863, "ชนะ", ""], ["พลตำรวจตรีสุรินทร์ ปาลาเร่", "ประชาธิปัตย์", "กล้าธรรม", "สงขลา", "8", 42932, 43540, "ชนะ", ""], ["นายองอาจ วงษ์ประยูร", "พลังประชารัฐ", "กล้าธรรม", "สระบุรี", "4", 29676, 48159, "ชนะ", ""], ["นายปรเมษฐ์ จินา", "รวมไทยสร้างชาติ", "กล้าธรรม", "สุราษฎร์ธานี", "5", 25520, 30967, "ชนะ", ""], ["นายไชยา พรหมา", "เพื่อไทย", "กล้าธรรม", "หนองบัวลำภู", "2", 32247, 16062, "อันดับ 2", "เพื่อไทย"], ["นายวุฒิพงษ์ นามบุตร", "ประชาธิปัตย์", "กล้าธรรม", "อุบลราชธานี", "2", 38164, 33798, "อันดับ 2", "ไทรวมพลัง"], ["นางรำพูล ตันติวณิชชานนท์", "ไทยสร้างไทย", "กล้าธรรม", "อุบลราชธานี", "9", 31311, 15396, "อันดับ 2", "ไทรวมพลัง"], ["นายนเรศ ธำรงค์ทิพยคุณ", "พลังประชารัฐ", "กล้าธรรม", "เชียงใหม่", "9", 31107, 43388, "ชนะ", ""], ["นายจักรัตน์ พั้วช่วย", "พลังประชารัฐ", "กล้าธรรม", "เพชรบูรณ์", "2", 38352, 40158, "อันดับ 2", "ภูมิใจไทย"], ["นายปกรณ์ จีนาคำ", "พลังประชารัฐ", "กล้าธรรม", "แม่ฮ่องสอน", "1", 18772, 35870, "ชนะ", ""], ["นายสุรพันธ์ ไวยากรณ์", "ก้าวไกล", "พลวัต", "นนทบุรี", "1", 45615, 791, "อันดับ 9", "ประชาชน"], ["นางสาวประภา เฮงไพบูลย์", "ภูมิใจไทย", "พลังประชารัฐ", "กาฬสินธุ์", "4", 31536, 25187, "อันดับ 2", "เพื่อไทย"], ["นายศักดิ์ดา วิเชียรศิลป์", "เพื่อไทย", "ภูมิใจไทย", "กาญจนบุรี", "5", 45812, 27305, "อันดับ 2", "เพื่อไทย"], ["นายประเสริฐ บุญเรือง", "เพื่อไทย", "ภูมิใจไทย", "กาฬสินธุ์", "6", 44002, 15141, "อันดับ 2", "เพื่อไทย"], ["นางสาวสรัสนันท์ อรรณนพพร", "เพื่อไทย", "ภูมิใจไทย", "ขอนแก่น", "9", 46057, 20997, "อันดับ 2", "เพื่อไทย"], ["นายจิรวุฒิ สิงห์โตทอง", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ชลบุรี", "4", 36128, 45751, "ชนะ", ""], ["นายอนันต์ ปรีดาสุทธิจิตต์", "เพื่อไทย", "ภูมิใจไทย", "ชลบุรี", "5", 41939, 52767, "ชนะ", ""], ["นายวิชัย สุดสวาสดิ์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ชุมพร", "1", 36222, 45966, "ชนะ", ""], ["นายสุพล จุลใส", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ชุมพร", "3", 41231, 42913, "ชนะ", ""], ["นายทวี สุระบาล", "พลังประชารัฐ", "ภูมิใจไทย", "ตรัง", "2", 63182, 42668, "ชนะ", ""], ["นางสาวสุณัฐชา โล่สถาพรพิพิธ", "ประชาธิปัตย์", "ภูมิใจไทย", "ตรัง", "3", 31846, 28897, "อันดับ 2", "ประชาธิปัตย์"], ["พลตำรวจตรีสุรพล บุญมา", "เพื่อไทย", "ภูมิใจไทย", "นครนายก", "1", 32030, 29822, "อันดับ 2", "กล้าธรรม"], ["นายเกรียงไกร กิตติธเนศวร", "เพื่อไทย", "ภูมิใจไทย", "นครนายก", "2", 39496, 34897, "ชนะ", ""], ["นายศุภโชค ศรีสุขจร", "ชาติไทยพัฒนา", "ภูมิใจไทย", "นครปฐม", "1", 39899, 57347, "ชนะ", ""], ["นายพาณุวัฒณ์ สะสมทรัพย์", "ชาติไทยพัฒนา", "ภูมิใจไทย", "นครปฐม", "3", 42825, 48099, "ชนะ", ""], ["นายอนุชา สะสมทรัพย์", "ชาติไทยพัฒนา", "ภูมิใจไทย", "นครปฐม", "5", 36422, 40896, "ชนะ", ""], ["นายโกศล ปัทมะ", "เพื่อไทย", "ภูมิใจไทย", "นครราชสีมา", "6", 32136, 19113, "อันดับ 2", "เพื่อไทย"], ["นายราชิต สุดพุ่ม", "ประชาธิปัตย์", "ภูมิใจไทย", "นครศรีธรรมราช", "1", 20334, 29583, "อันดับ 2", "ประชาธิปัตย์"], ["นายสุธรรม จริตงาม", "พลังประชารัฐ", "ภูมิใจไทย", "นครศรีธรรมราช", "5", 26285, 31394, "อันดับ 2", "กล้าธรรม"], ["นางอวยพรศรี เชาวลิต", "ประชาธิปัตย์", "ภูมิใจไทย", "นครศรีธรรมราช", "8", 35976, 54040, "ชนะ", ""], ["นางสาวพิมพ์ภัทรา วิชัยกุล", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "นครศรีธรรมราช", "9", 44233, 46473, "ชนะ", ""], ["นายประสาท ตันประเสริฐ", "ชาติพัฒนากล้า", "ภูมิใจไทย", "นครสวรรค์", "6", 24089, 36543, "ชนะ", ""], ["นายวัชระ ยาวอหะซัน", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "นราธิวาส", "1", 29006, 35026, "อันดับ 2", "กล้าธรรม"], ["นายคอซีย์ มามุ", "พลังประชารัฐ", "ภูมิใจไทย", "ปัตตานี", "2", 23483, 38541, "ชนะ", ""], ["นายสาเหะมูหามัด อัลอิดรุส", "ประชาชาติ", "ภูมิใจไทย", "ปัตตานี", "5", 37068, 34313, "ชนะ", ""], ["นายฉกาจ พัฒนกิจวิบูลย์", "พลังประชารัฐ", "ภูมิใจไทย", "พังงา", "2", 21506, 26513, "ชนะ", ""], ["นายพงษ์มนู ทองหนัก", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "พิษณุโลก", "3", 22765, 42353, "ชนะ", ""], ["นายวิริยะ ทองผา", "พลังประชารัฐ", "ภูมิใจไทย", "มุกดาหาร", "1", 33514, 31342, "ชนะ", ""], ["นางสุภาพร สลับศรี", "ไทยสร้างไทย", "ภูมิใจไทย", "ยโสธร", "1", 53130, 49334, "ชนะ", ""], ["นางสาวกุลวลี นพอมรบดี", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ราชบุรี", "1", 52941, 56407, "ชนะ", ""], ["นายอัครเดช วงษ์พิทักษ์โรจน์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ราชบุรี", "4", 54815, 55778, "ชนะ", ""], ["นายอนุรักษ์ จุรีมาศ", "ชาติไทยพัฒนา", "ภูมิใจไทย", "ร้อยเอ็ด", "1", 40436, 50238, "ชนะ", ""], ["นายนรากร นาเมืองรักษ์", "เพื่อไทย", "ภูมิใจไทย", "ร้อยเอ็ด", "4", 36822, 16270, "อันดับ 3", "เพื่อไทย"], ["นายกิตติ สมทรัพย์", "เพื่อไทย", "ภูมิใจไทย", "ร้อยเอ็ด", "6", 36878, 20825, "อันดับ 2", "เพื่อไทย"], ["นายชัยมงคล ไชยรบ", "พลังประชารัฐ", "ภูมิใจไทย", "สกลนคร", "5", 29085, 22054, "อันดับ 2", "กล้าธรรม"], ["นายสรรเพชญ บุญญามณี", "ประชาธิปัตย์", "ภูมิใจไทย", "สงขลา", "1", 40521, 44252, "ชนะ", ""], ["นายศาสตรา ศรีปาน", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สงขลา", "2", 20553, 18935, "อันดับ 3", "ประชาธิปัตย์"], ["นายสมยศ พลายด้วง", "ประชาธิปัตย์", "ภูมิใจไทย", "สงขลา", "3", 39577, 36656, "ชนะ", ""], ["นายอรรถพล วงษ์ประยูร", "เพื่อไทย", "ภูมิใจไทย", "สระบุรี", "2", 38203, 37225, "ชนะ", ""], ["นายโชติวุฒิ ธนาคมานุสรณ์", "พลังประชารัฐ", "ภูมิใจไทย", "สิงห์บุรี", "1", 42292, 65555, "ชนะ", ""], ["นายสรชัด สุจิตต์", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "1", 46324, 63205, "ชนะ", ""], ["นายณัฐวุฒิ ประเสริฐสุวรรณ", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "2", 43795, 45297, "ชนะ", ""], ["นายนพดล มาตรศรี", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "3", 39348, 39798, "อันดับ 2", "กล้าธรรม"], ["นายเสมอกัน เที่ยงธรรม", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "4", 42639, 58049, "ชนะ", ""], ["นายประภัตร โพธสุธน", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "5", 55877, 60036, "ชนะ", ""], ["นางสาวกานสินี โอภาสรังสรรค์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สุราษฎร์ธานี", "1", 27978, 27647, "ชนะ", ""], ["นายพิพิธ รัตนรักษ์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สุราษฎร์ธานี", "2", 24625, 27071, "ชนะ", ""], ["นายพันธ์ศักดิ์ บุญแทน", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สุราษฎร์ธานี", "4", 26043, 28117, "อันดับ 2", "ประชาธิปัตย์"], ["นายธานินท์ นวลวัฒน์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สุราษฎร์ธานี", "7", 30359, 30081, "อันดับ 2", "กล้าธรรม"], ["นายหรั่ง ธุระพล", "ไทยสร้างไทย", "ภูมิใจไทย", "อุดรธานี", "3", 36250, 33013, "ชนะ", ""], ["นายภาณุ พรวัฒนา", "เพื่อไทย", "ภูมิใจไทย", "อุดรธานี", "4", 21475, 22361, "อันดับ 2", "เพื่อไทย"], ["นายอดิศักดิ์ แก้วมุงคุณทรัพย์", "ไทยสร้างไทย", "ภูมิใจไทย", "อุดรธานี", "6", 27751, 36722, "ชนะ", ""], ["นางสาวสุดารัตน์ พิทักษ์พรพัลลภ", "เพื่อไทย", "ภูมิใจไทย", "อุบลราชธานี", "7", 38533, 45003, "ชนะ", ""], ["นางธิวัลรัตน์ อังกินันทน์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "เพชรบุรี", "1", 40235, 61734, "ชนะ", ""], ["จ่าอากาศเอกอภิชาติ แก้วโกศล", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "เพชรบุรี", "3", 48107, 71153, "ชนะ", ""], ["นางสาวพิมพ์พร พรพฤฒิพันธุ์", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "1", 35905, 50631, "ชนะ", ""], ["นายบุญชัย กิตติธาราทรัพย์", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "3", 31707, 39652, "ชนะ", ""], ["นายวรโชติ สุคนธ์ขจร", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "4", 41039, 48590, "ชนะ", ""], ["นางวันเพ็ญ พร้อมพัฒน์", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "5", 34971, 45747, "ชนะ", ""], ["นายอัคร ทองใจสด", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "6", 47118, 59008, "ชนะ", ""], ["นายสมบัติ ยะสินธุ์", "ประชาธิปัตย์", "ภูมิใจไทย", "แม่ฮ่องสอน", "2", 20346, 24897, "ชนะ", ""], ["นายอนุชา นาคาศัย", "รวมไทยสร้างชาติ", "เพื่อไทย", "ชัยนาท", "1", 43935, 36058, "ชนะ", ""], ["นายนิติศักดิ์ ธรรมเพชร", "รวมไทยสร้างชาติ", "เพื่อไทย", "พัทลุง", "2", 41201, 35813, "อันดับ 2", "ภูมิใจไทย"], ["นางสาวรภัสสรณ์ นิยะโมสถ", "ก้าวไกล", "เพื่อไทย", "ลำปาง", "4", 47027, 13288, "อันดับ 4", "กล้าธรรม"], ["นายสรวีย์ ศุภปณิตา", "ก้าวไกล", "เศรษฐกิจ", "ปทุมธานี", "6", 29272, 2767, "อันดับ 6", "ประชาชน"], ["นางสาววชิราภรณ์ กาญจนะ", "รวมไทยสร้างชาติ", "ไทรวมพลัง", "สุราษฎร์ธานี", "3", 46456, 39958, "ชนะ", ""]];
+const MOVERS = [["นายจำลอง ภูนวนทา", "พลังประชารัฐ", "กล้าธรรม", "กาฬสินธุ์", "3", "พลังประชารัฐ"], ["นายไผ่ ลิกค์", "พลังประชารัฐ", "กล้าธรรม", "กำแพงเพชร", "1", "พลังประชารัฐ"], ["นายเพชรภูมิ อาภรณ์รัตน์", "พลังประชารัฐ", "กล้าธรรม", "กำแพงเพชร", "2", "พลังประชารัฐ"], ["นายอรรถกร ศิริลัทธยากร", "พลังประชารัฐ", "กล้าธรรม", "ฉะเชิงเทรา", "2", "พลังประชารัฐ"], ["นายอัครแสนคีรี โล่ห์วีระ", "พลังประชารัฐ", "กล้าธรรม", "ชัยภูมิ", "7", "พลังประชารัฐ"], ["นายภาคภูมิ บูลย์ประมุข", "พลังประชารัฐ", "กล้าธรรม", "ตาก", "3", "พลังประชารัฐ"], ["พันโทสินธพ แก้วพิจิตร", "รวมไทยสร้างชาติ", "กล้าธรรม", "นครปฐม", "2", "รวมไทยสร้างชาติ"], ["นายสัญญา นิลสุพรรณ", "รวมไทยสร้างชาติ", "กล้าธรรม", "นครสวรรค์", "3", "รวมไทยสร้างชาติ"], ["นายอามินทร์ มะยูโซ๊ะ", "พลังประชารัฐ", "กล้าธรรม", "นราธิวาส", "2", "พลังประชารัฐ"], ["นายสัมพันธ์ มะยูโซ๊ะ", "พลังประชารัฐ", "กล้าธรรม", "นราธิวาส", "3", "พลังประชารัฐ"], ["นายจักพันธ์ ปิยพรไพบูลย์", "ประชาธิปัตย์", "กล้าธรรม", "ประจวบคีรีขันธ์", "2", "ประชาธิปัตย์"], ["นายยูนัยดี วาบา", "ประชาธิปัตย์", "กล้าธรรม", "ปัตตานี", "4", "ประชาธิปัตย์"], ["นายอนุรัตน์ ตันบรรจง", "พลังประชารัฐ", "กล้าธรรม", "พะเยา", "2", "พลังประชารัฐ"], ["นายจีรเดช ศรีวิราช", "พลังประชารัฐ", "กล้าธรรม", "พะเยา", "3", "พลังประชารัฐ"], ["นางบุญยิ่ง นิติกาญจนา", "พลังประชารัฐ", "กล้าธรรม", "ราชบุรี", "2", "พลังประชารัฐ"], ["นายจตุพร กมลพันธ์ทิพย์", "พลังประชารัฐ", "กล้าธรรม", "ราชบุรี", "3", "พลังประชารัฐ"], ["นางรัชนี พลซื่อ", "พลังประชารัฐ", "กล้าธรรม", "ร้อยเอ็ด", "3", "พลังประชารัฐ"], ["นายชาตรี หล้าพรหม", "ประชาธิปัตย์", "กล้าธรรม", "สกลนคร", "2", "ประชาธิปัตย์"], ["นายชนนพัฒฐ์ นาคสั้ว", "พลังประชารัฐ", "กล้าธรรม", "สงขลา", "4", "พลังประชารัฐ"], ["พลตำรวจตรีสุรินทร์ ปาลาเร่", "ประชาธิปัตย์", "กล้าธรรม", "สงขลา", "8", "ประชาธิปัตย์"], ["นายองอาจ วงษ์ประยูร", "พลังประชารัฐ", "กล้าธรรม", "สระบุรี", "4", "พลังประชารัฐ"], ["นายปรเมษฐ์ จินา", "รวมไทยสร้างชาติ", "กล้าธรรม", "สุราษฎร์ธานี", "5", "รวมไทยสร้างชาติ"], ["นายนเรศ ธำรงค์ทิพยคุณ", "พลังประชารัฐ", "กล้าธรรม", "เชียงใหม่", "9", "พลังประชารัฐ"], ["นายปกรณ์ จีนาคำ", "พลังประชารัฐ", "กล้าธรรม", "แม่ฮ่องสอน", "1", "พลังประชารัฐ"], ["นายจิรวุฒิ สิงห์โตทอง", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ชลบุรี", "4", "รวมไทยสร้างชาติ"], ["นายอนันต์ ปรีดาสุทธิจิตต์", "เพื่อไทย", "ภูมิใจไทย", "ชลบุรี", "5", "เพื่อไทย"], ["นายวิชัย สุดสวาสดิ์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ชุมพร", "1", "รวมไทยสร้างชาติ"], ["นายสุพล จุลใส", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ชุมพร", "3", "รวมไทยสร้างชาติ"], ["นายทวี สุระบาล", "พลังประชารัฐ", "ภูมิใจไทย", "ตรัง", "2", "พลังประชารัฐ"], ["นายเกรียงไกร กิตติธเนศวร", "เพื่อไทย", "ภูมิใจไทย", "นครนายก", "2", "เพื่อไทย"], ["นายศุภโชค ศรีสุขจร", "ชาติไทยพัฒนา", "ภูมิใจไทย", "นครปฐม", "1", "ชาติไทยพัฒนา"], ["นายพาณุวัฒณ์ สะสมทรัพย์", "ชาติไทยพัฒนา", "ภูมิใจไทย", "นครปฐม", "3", "ชาติไทยพัฒนา"], ["นายอนุชา สะสมทรัพย์", "ชาติไทยพัฒนา", "ภูมิใจไทย", "นครปฐม", "5", "ชาติไทยพัฒนา"], ["นางอวยพรศรี เชาวลิต", "ประชาธิปัตย์", "ภูมิใจไทย", "นครศรีธรรมราช", "8", "ประชาธิปัตย์"], ["นางสาวพิมพ์ภัทรา วิชัยกุล", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "นครศรีธรรมราช", "9", "รวมไทยสร้างชาติ"], ["นายประสาท ตันประเสริฐ", "ชาติพัฒนา", "ภูมิใจไทย", "นครสวรรค์", "6", "ชาติพัฒนากล้า"], ["นายคอซีย์ มามุ", "พลังประชารัฐ", "ภูมิใจไทย", "ปัตตานี", "2", "พลังประชารัฐ"], ["นายสาเหะมูหามัด อัลอิดรุส", "ประชาชาติ", "ภูมิใจไทย", "ปัตตานี", "5", "ประชาชาติ"], ["นายฉกาจ พัฒนกิจวิบูลย์", "พลังประชารัฐ", "ภูมิใจไทย", "พังงา", "2", "พลังประชารัฐ"], ["นายพงษ์มนู ทองหนัก", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "พิษณุโลก", "3", "รวมไทยสร้างชาติ"], ["นายวิริยะ ทองผา", "พลังประชารัฐ", "ภูมิใจไทย", "มุกดาหาร", "1", "พลังประชารัฐ"], ["นางสุภาพร สลับศรี", "ไทยสร้างไทย", "ภูมิใจไทย", "ยโสธร", "1", "ไทยสร้างไทย"], ["นางสาวกุลวลี นพอมรบดี", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ราชบุรี", "1", "รวมไทยสร้างชาติ"], ["นายอัครเดช วงษ์พิทักษ์โรจน์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "ราชบุรี", "4", "รวมไทยสร้างชาติ"], ["นายอนุรักษ์ จุรีมาศ", "ชาติไทยพัฒนา", "ภูมิใจไทย", "ร้อยเอ็ด", "1", "ชาติไทยพัฒนา"], ["นายสรรเพชญ บุญญามณี", "ประชาธิปัตย์", "ภูมิใจไทย", "สงขลา", "1", "ประชาธิปัตย์"], ["นายสมยศ พลายด้วง", "ประชาธิปัตย์", "ภูมิใจไทย", "สงขลา", "3", "ประชาธิปัตย์"], ["นายอรรถพล วงษ์ประยูร", "เพื่อไทย", "ภูมิใจไทย", "สระบุรี", "2", "เพื่อไทย"], ["นายโชติวุฒิ ธนาคมานุสรณ์", "พลังประชารัฐ", "ภูมิใจไทย", "สิงห์บุรี", "1", "พลังประชารัฐ"], ["นายสรชัด สุจิตต์", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "1", "ชาติไทยพัฒนา"], ["นายณัฐวุฒิ ประเสริฐสุวรรณ", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "2", "ชาติไทยพัฒนา"], ["นายเสมอกัน เที่ยงธรรม", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "4", "ชาติไทยพัฒนา"], ["นายประภัตร โพธสุธน", "ชาติไทยพัฒนา", "ภูมิใจไทย", "สุพรรณบุรี", "5", "ชาติไทยพัฒนา"], ["นางสาวกานสินี โอภาสรังสรรค์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สุราษฎร์ธานี", "1", "รวมไทยสร้างชาติ"], ["นายพิพิธ รัตนรักษ์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "สุราษฎร์ธานี", "2", "รวมไทยสร้างชาติ"], ["นายหรั่ง ธุระพล", "ไทยสร้างไทย", "ภูมิใจไทย", "อุดรธานี", "3", "ไทยสร้างไทย"], ["นายอดิศักดิ์ แก้วมุงคุณทรัพย์", "ไทยสร้างไทย", "ภูมิใจไทย", "อุดรธานี", "6", "ไทยสร้างไทย"], ["นางสาวสุดารัตน์ พิทักษ์พรพัลลภ", "เพื่อไทย", "ภูมิใจไทย", "อุบลราชธานี", "7", "เพื่อไทย"], ["นางธิวัลรัตน์ อังกินันทน์", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "เพชรบุรี", "1", "รวมไทยสร้างชาติ"], ["จ่าอากาศเอกอภิชาติ แก้วโกศล", "รวมไทยสร้างชาติ", "ภูมิใจไทย", "เพชรบุรี", "3", "รวมไทยสร้างชาติ"], ["นางสาวพิมพ์พร พรพฤฒิพันธุ์", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "1", "พลังประชารัฐ"], ["นายบุญชัย กิตติธาราทรัพย์", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "3", "พลังประชารัฐ"], ["นายวรโชติ สุคนธ์ขจร", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "4", "พลังประชารัฐ"], ["นางวันเพ็ญ พร้อมพัฒน์", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "5", "พลังประชารัฐ"], ["นายอัคร ทองใจสด", "พลังประชารัฐ", "ภูมิใจไทย", "เพชรบูรณ์", "6", "พลังประชารัฐ"], ["นายสมบัติ ยะสินธุ์", "ประชาธิปัตย์", "ภูมิใจไทย", "แม่ฮ่องสอน", "2", "ประชาธิปัตย์"], ["นายอนุชา นาคาศัย", "รวมไทยสร้างชาติ", "เพื่อไทย", "ชัยนาท", "1", "รวมไทยสร้างชาติ"], ["นางสาววชิราภรณ์ กาญจนะ", "รวมไทยสร้างชาติ", "ไทรวมพลัง", "สุราษฎร์ธานี", "3", "รวมไทยสร้างชาติ"]];
+DATA.push(["ชาติไทยพัฒนา",0],["ชาติพัฒนา",0]);
+COLORS["ชาติไทยพัฒนา"]="#d94f8f";COLORS["ชาติพัฒนา"]="#e8962e";
+const IN = {}, BACK = {};
+MOVERS.forEach(([n, from, to]) => { IN[to] = (IN[to] || 0) + 1; BACK[from] = (BACK[from] || 0) + 1; });
+let CF = false;
+const FALLBACK = ["#7b6a8f","#5f8a94","#8a7a4a","#8f5f6f","#4f7f6a","#6f7482","#a0643c"];
+const parties = DATA.map(([name, seats], i) => ({ name, seats, base: seats, order: i, color: COLORS[name] || FALLBACK[i % FALLBACK.length] }));
+function applyMode() { parties.forEach(p => { p.seats = CF ? p.base - (IN[p.name] || 0) + (BACK[p.name] || 0) : p.base; }); }
+const PHOTOS = {};
+parties.forEach(p => { if (PHOTOS[p.name]) p.img = PHOTOS[p.name]; });
+const LOGOS = {};
+/* โลโก้ทุกพรรคจากเว็บรายงานผลการเลือกตั้งของ กกต. (ectreport69.ect.go.th) */
+const ECT_LOGO = n => `https://ectreport69.ect.go.th/images/logos/${encodeURIComponent(n)}.${n === "โอกาสใหม่" ? "png" : "jpg"}`;
+["ภูมิใจไทย","ประชาชน","เพื่อไทย","กล้าธรรม","ประชาธิปัตย์","พลังประชารัฐ","รวมไทยสร้างชาติ","ชาติไทยพัฒนา","ไทรวมพลัง","ประชาชาติ","ไทยสร้างไทย","เศรษฐกิจ","เพื่อชาติไทย","ชาติพัฒนา","เสรีรวมไทย","ใหม่","ไทยทรัพย์ทวี","ไทยภักดี","ทางเลือกใหม่","ประชาธิปไตยใหม่","มิติใหม่","รวมใจไทย","รวมพลังประชาชน","โอกาสใหม่"].forEach(n => { if (!LOGOS[n]) LOGOS[n] = ECT_LOGO(n); });
+parties.forEach(p => { if (LOGOS[p.name]) p.logo = LOGOS[p.name]; });
+const TOTAL = parties.reduce((s, p) => s + p.base, 0);
+const MAJ = Math.floor(TOTAL / 2) + 1;
+const byName = Object.fromEntries(parties.map(p => [p.name, p]));
+let side = {};
+const sortFn = (a, b) => b.seats - a.seats || a.order - b.order;
+
+function reset() { parties.forEach(p => side[p.name] = "pool"); }
+reset();
+
+const CHAIR = '<svg viewBox="0 0 64 76" aria-hidden="true"><rect x="14" y="3" width="36" height="38" rx="12" fill="#ddd5c5"/><path d="M24 14 L32 22 L40 14 M24 30 L32 22 L40 30" stroke="#d2c9b7" stroke-width="1.2" fill="none"/><circle cx="24" cy="14" r="1.7" fill="#c2b8a3"/><circle cx="40" cy="14" r="1.7" fill="#c2b8a3"/><circle cx="32" cy="22" r="1.7" fill="#c2b8a3"/><circle cx="24" cy="30" r="1.7" fill="#c2b8a3"/><circle cx="40" cy="30" r="1.7" fill="#c2b8a3"/><rect x="4" y="30" width="10" height="22" rx="5" fill="#cfc6b4"/><rect x="50" y="30" width="10" height="22" rx="5" fill="#cfc6b4"/><rect x="10" y="38" width="44" height="15" rx="6" fill="#d6cebd"/><rect x="13" y="40" width="38" height="4" rx="2" fill="#e6dfd2"/><rect x="14" y="53" width="5" height="16" rx="2.5" fill="#c4baa6"/><rect x="45" y="53" width="5" height="16" rx="2.5" fill="#c4baa6"/><ellipse cx="32" cy="72" rx="22" ry="2.5" fill="#e4ddd0"/></svg>';
+const throne = big => `<div class="throne">${CHAIR}${big ? '<span class="tlabel">ที่นั่งว่าง</span>' : ''}</div>`;
+const lead = n => { const m = [...n].find(c => !"เแโไใ".includes(c)); return m || n[0]; };
+
+function cardHTML(p, mini) {
+  const face = p.logo || (p.img && mini ? p.img : null);
+  const e = `<span class="emb ${p.logo ? "logo" : ""}">${face ? `<img src="${face}" alt="" draggable="false">` : lead(p.name)}</span>`;
+  const chip = CF ? (p.seats !== p.base ? `<span class="mv dn" title="ผลจริงปี 2569">จริง ${p.base}</span>` : '') : (IN[p.name] ? `<span class="mv" title="สส. เขตปี 2566 ที่ย้ายมาแล้วชนะ">ย้ายมา ${IN[p.name]}</span>` : '');
+  const cls = `card ${mini ? "mini" : ""} ${p.img && !mini ? "has-img" : ""} ${chip && !mini ? "has-mv" : ""}`;
+  const photo = p.img && !mini ? `<img class="photo" src="${p.img}" alt="" draggable="false">` : "";
+  return `<div class="${cls}" tabindex="0" role="button" data-name="${p.name}" style="--c:${p.color}" title="${p.name} ${p.seats} ที่นั่ง${CF && p.seats !== p.base ? ` (ผลจริง ${p.base})` : (!CF && IN[p.name] ? ` (มี สส. ย้ายมา ${IN[p.name]})` : '')}" aria-label="${p.name} ${p.seats} ที่นั่ง">` +
+    (mini ? `${e}<span class="seat">${p.seats}</span>` : `${photo}<span class="nm">${p.name}</span>${p.img ? e : `<span class="embwrap">${e}</span>`}<span class="seat">${p.seats}<small>ที่นั่ง</small>${chip}</span>`) + `</div>`;
+}
+
+function sideHTML(key, label) {
+  const list = parties.filter(p => side[p.name] === key && p.seats > 0).sort(sortFn);
+  const sum = list.reduce((s, p) => s + p.seats, 0);
+  const big = [list[1], list[0], list[2]]; // centre = largest
+  const rest = list.slice(3);
+  const nMini = Math.max(6, Math.ceil(rest.length / 6) * 6);
+  let thr = "", minis = "";
+  big.forEach((p, i) => { thr += `<div class="slot-big ${i === 1 ? "c" : ""}">${p ? cardHTML(p, false) : throne(true)}</div>`; });
+  for (let i = 0; i < nMini; i++) minis += `<div class="slot-mini">${rest[i] ? cardHTML(rest[i], true) : throne()}</div>`;
+  const win = sum >= MAJ;
+  const note = win ? `<span class="win">เสียงข้างมาก เกิน ${sum - MAJ + 1 > 0 ? sum - MAJ : 0} ที่นั่งจากเส้น ${MAJ}</span>` : `<span>ขาดอีก ${MAJ - sum} ที่นั่งถึง ${MAJ}</span>`;
+  return `<div class="score"><div class="score-top"><span class="score-name">${label}</span><span class="score-num">${sum}<small>ที่นั่ง</small></span></div>
+    <div class="meter" aria-hidden="true"><i style="width:${sum / TOTAL * 100}%"></i><b></b></div>
+    <div class="meter-note">${note}<span>${list.length} พรรค</span></div>${depend(list, sum)}</div>
+    <div class="zone" data-zone="${key}"><div class="thrones">${thr}</div><div class="minis">${minis}</div></div>`;
+}
+
+function depend(list, sum) {
+  if (!list.length) return '';
+  if (CF) {
+    const real = list.reduce((s, p) => s + p.base, 0), d = sum - real;
+    return `<div class="depend"><span>ผลจริงของพรรคชุดนี้ ${real} ที่นั่ง · ${d === 0 ? 'ไม่ต่าง' : (d > 0 ? 'มากกว่าจริง ' + d : 'น้อยกว่าจริง ' + (-d))}${real >= MAJ && sum < MAJ ? ' · <b>ไม่ถึง ' + MAJ + ' ถ้าไม่มีการย้ายพรรค</b>' : ''}</span></div>`;
+  }
+  const m = list.reduce((s, p) => s + (IN[p.name] || 0), 0);
+  if (!m) return `<div class="depend"><span>ไม่มีที่นั่งจาก สส. เขตปี 2566 ที่ย้ายพรรคเข้ามา</span></div>`;
+  return `<div class="depend"><span>มาจาก สส. ย้ายพรรค ${m} ที่นั่ง (${Math.round(m / sum * 100)}%)</span><span class="bar" aria-hidden="true"><i style="width:${m / sum * 100}%"></i></span></div>`;
+}
+/* celebration when the government side first reaches the majority line */
+let govWon = false, toastT = 0;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function confetti(colors) {
+  if (reduceMotion) return;
+  const cv = document.getElementById("fx"), ctx = cv.getContext("2d"), dpr = devicePixelRatio || 1;
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const r = document.getElementById("gov").getBoundingClientRect();
+  const ox = r.left + r.width / 2, oy = Math.max(40, r.top + 60);
+  const pal = colors.concat(["#f2d27a", "#ffffff", "#7fc9c1"]);
+  const P = Array.from({ length: 160 }, () => { const a = -Math.PI / 2 + (Math.random() - .5) * 2.2, v = 6 + Math.random() * 9;
+    return { x: ox + (Math.random() - .5) * r.width * .5, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, w: 6 + Math.random() * 6, h: 8 + Math.random() * 8, rot: Math.random() * 6, vr: (Math.random() - .5) * .35, c: pal[Math.random() * pal.length | 0], round: Math.random() < .3 }; });
+  const t0 = performance.now();
+  (function tick(t) {
+    const el = t - t0; ctx.clearRect(0, 0, innerWidth, innerHeight);
+    P.forEach(p => { p.vy += .28; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - el / 2600); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
+      if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, 7); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.rot * 2)) + 2);
+      ctx.restore(); });
+    if (el < 2600) requestAnimationFrame(tick); else ctx.clearRect(0, 0, innerWidth, innerHeight);
+  })(t0);
+}
+function celebrate(list, sum) {
+  const t = document.getElementById("toast");
+  t.innerHTML = `<span class="dot"></span>จัดตั้งรัฐบาลได้! <small>${sum} เสียง · ${list.length} พรรค</small>`;
+  t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 3200);
+  confetti(list.map(p => p.color));
+}
+function render() {
+  document.getElementById("gov").innerHTML = sideHTML("gov", "ฝ่ายรัฐบาล");
+  { const gl = parties.filter(p => side[p.name] === "gov" && p.seats > 0), gs = gl.reduce((a, p) => a + p.seats, 0), w = gs >= MAJ;
+    document.getElementById("gov").classList.toggle("won", w);
+    if (w && !govWon) celebrate(gl, gs);
+    if (!w) document.getElementById("toast").classList.remove("show");
+    govWon = w; }
+  document.getElementById("opp").innerHTML = sideHTML("opp", "ฝ่ายค้าน");
+  const pool = parties.filter(p => side[p.name] === "pool" && p.seats > 0).sort(sortFn);
+  document.getElementById("pool").innerHTML = pool.length
+    ? pool.map(p => `<div class="cell">${cardHTML(p, false)}</div>`).join("")
+    : `<div class="empty">จัดครบทุกพรรคแล้ว ลองพลิกขั้วหรือลากพรรคกลับมาที่นี่</div>`;
+  const left = pool.reduce((s, p) => s + p.seats, 0);
+  document.getElementById("poolCount").textContent = `· ${pool.length} พรรค ${left} ที่นั่ง`;
+}
+
+/* drag and drop with pointer events (mouse, touch, pen) */
+let drag = null;
+document.addEventListener("pointerdown", e => {
+  const card = e.target.closest(".card");
+  if (!card || e.button > 0) return;
+  drag = { name: card.dataset.name, card, x: e.clientX, y: e.clientY, ghost: null, id: e.pointerId };
+});
+document.addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.ghost) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+    const r = drag.card.getBoundingClientRect();
+    const g = document.createElement("div");
+    g.className = "ghost";
+    g.style.width = Math.max(r.width, 84) + "px";
+    g.style.height = Math.max(r.height, 112) + "px";
+    g.innerHTML = cardHTML(byName[drag.name], false);
+    document.body.appendChild(g);
+    drag.ghost = g;
+    drag.card.classList.add("dragging");
+  }
+  drag.ghost.style.left = e.clientX + "px";
+  drag.ghost.style.top = e.clientY + "px";
+  document.querySelectorAll(".over").forEach(n => n.classList.remove("over"));
+  const z = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-zone]");
+  if (z) z.classList.add("over");
+  e.preventDefault();
+}, { passive: false });
+function endDrag(e, cancel) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null;
+  document.querySelectorAll(".over").forEach(n => n.classList.remove("over"));
+  if (!d.ghost) return;
+  d.ghost.remove();
+  const z = cancel ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-zone]");
+  if (z) side[d.name] = z.dataset.zone;
+  render();
+}
+document.addEventListener("pointerup", e => endDrag(e, false));
+document.addEventListener("pointercancel", e => endDrag(e, true));
+
+/* keyboard: G / O / P move the focused card, Enter cycles */
+document.addEventListener("keydown", e => {
+  const card = e.target.closest?.(".card");
+  if (!card) return;
+  const n = card.dataset.name, k = e.key.toLowerCase();
+  const map = { g: "gov", o: "opp", p: "pool" };
+  if (map[k]) side[n] = map[k];
+  else if (e.key === "Enter" || e.key === " ") { side[n] = { pool: "gov", gov: "opp", opp: "pool" }[side[n]]; e.preventDefault(); }
+  else return;
+  render();
+  document.querySelector(`.card[data-name="${n}"]`)?.focus();
+});
+
+document.getElementById("flip").onclick = () => {
+  parties.forEach(p => { if (side[p.name] === "gov") side[p.name] = "opp"; else if (side[p.name] === "opp") side[p.name] = "gov"; });
+  render();
+};
+document.getElementById("reset").onclick = () => { reset(); render(); };
+document.getElementById("cf").onclick = e => { CF = !CF; e.currentTarget.setAttribute("aria-pressed", CF); document.getElementById("cfbar").hidden = !CF; applyMode(); render(); };
+const LMAP = { "ก้าวไกล": "ประชาชน", "ชาติพัฒนากล้า": "ชาติพัฒนา" };
+const lin = p => LMAP[p] || p;
+let mvTab = "win", mvFrom = "";
+const fmt = n => n.toLocaleString("th-TH");
+const pcol = n => (byName[n] && byName[n].color) || "#9a958a";
+function moversList() {
+  const all = ALLMV, win = all.filter(m => m[7] === "ชนะ"), lose = all.filter(m => m[7] !== "ชนะ");
+  const rates = (key, colOf) => {
+    const by = {}; all.forEach(m => { const o = by[m[key]] = by[m[key]] || { n: 0, w: 0 }; o.n++; if (m[7] === "ชนะ") o.w++; });
+    return Object.entries(by).sort((a, b) => (b[1].n >= 3) - (a[1].n >= 3) || (b[1].w / b[1].n) - (a[1].w / a[1].n) || b[1].n - a[1].n).map(([p, o]) =>
+      `<div class="mvrate${o.w === 0 && o.n >= 3 ? " zero" : ""}${o.n < 3 ? " few" : ""}" title="${p} ${o.n} คน ชนะ ${o.w} คน"><b>${p}</b><span class="rb"><i style="width:${o.w / o.n * 100}%;background:${colOf(p)}"></i></span><span${o.w === 0 && o.n >= 3 ? ' class="zt"' : ""}>${o.w === 0 && o.n >= 3 ? `แพ้ทั้ง ${o.n} คน` : `ชนะ ${o.w}/${o.n} (${Math.round(o.w / o.n * 100)}%)`}</span></div>`).join("");
+  };
+  document.getElementById("mvrates").innerHTML = rates(2, pcol);
+  document.getElementById("mvrates2").innerHTML = rates(1, p => pcol(lin(p)));
+  const ff = all.filter(m => m[1] === "ก้าวไกล"), ffOld = ff.filter(m => lin(m[8]) === "ประชาชน").length;
+  const keep = ff.map(m => m[6] / m[5]).sort((a, b) => a - b), kMed = keep[keep.length >> 1];
+  const hl = document.getElementById("mvhl");
+  hl.setAttribute("aria-pressed", mvFrom === "ก้าวไกล");
+  hl.innerHTML = `<div class="hd">ออกจากก้าวไกล ${ff.length} คน แพ้ทั้ง ${ff.length} คน</div>
+    <div class="sb">${ffOld} คนแพ้ให้พรรคประชาชน (พรรคเดิม) · คะแนนเหลือค่ากลางเพียง ${(kMed * 100).toFixed(1)}% ของปี 2566 · แถบอ่อน = คะแนนปี 2566, แถบเข้ม = ปี 2569</div>
+    <div class="bars">${ff.sort((a, b) => a[6] / a[5] - b[6] / b[5]).map(m => `<div class="br"><span>${m[0].replace(/^(นางสาว|นาง|นาย)/, "")} → ${m[2]}</span><span class="tr" style="width:${m[5] / Math.max(...ff.map(x => x[5])) * 100}%"><i style="width:${m[6] / m[5] * 100}%"></i></span><span>${fmt(m[5])} → ${fmt(m[6])}</span></div>`).join("")}</div>
+    <div class="cta">${mvFrom ? "✕ แสดงทุกคน" : "ดูรายชื่อ 5 คนนี้ ↓"}</div>`;
+  const toOld = lose.filter(m => m[8] && lin(m[8]) === lin(m[1])).length;
+  const med = a => { const v = a.map(m => m[6] / m[5] - 1).sort((x, y) => x - y); return v[v.length >> 1]; };
+  const pct = v => (v >= 0 ? "+" : "") + Math.round(v * 100) + "%";
+  document.getElementById("mvnote").textContent = mvTab === "win"
+    ? `คะแนนเพิ่มขึ้นจากปี 2566 ค่ากลาง ${pct(med(win))}`
+    : `แพ้ให้พรรคเดิมของตัวเอง ${toOld} คน · คะแนนเปลี่ยนค่ากลาง ${pct(med(lose))}`;
+  const list = (mvTab === "win" ? win : lose).filter(m => !mvFrom || m[1] === mvFrom);
+  const from = {}; list.forEach(m => from[m[1]] = (from[m[1]] || 0) + 1);
+  document.getElementById("mvsum").innerHTML = '<span>ย้ายออกจาก: ' + Object.entries(from).sort((a, b) => b[1] - a[1]).map(([p, c]) => `${p} ${c}`).join(" · ") + "</span>";
+  const g = {}; list.forEach(m => (g[m[2]] = g[m[2]] || []).push(m));
+  document.getElementById("mvgrid").innerHTML = Object.entries(g).sort((a, b) => b[1].length - a[1].length).map(([to, ms]) =>
+    `<div class="mvgrp"><h4><i style="background:${pcol(to)}"></i>ย้ายไป${to} ${ms.length} คน</h4><ul>${ms.sort((a, b) => (b[6] / b[5]) - (a[6] / a[5])).map(([n, f, t, pv, ds, v66, v69, res, wby]) => {
+      const ch = v69 / v66 - 1, old = wby && lin(wby) === lin(f);
+      return `<li><span class="nmv">${n.replace(/^(นางสาว|นาง|นาย)/, "")}</span>${old ? '<span class="lost">แพ้พรรคเดิม</span>' : ""}<span class="dt">${pv} ${ds} · จาก${f}${res !== "ชนะ" ? ` · <span class="rk">${res}</span> แพ้${wby}` : ""} · <span class="vt ${ch >= 0 ? "up" : "dn"}" title="คะแนนปี 2566 → 2569">${fmt(v66)} → ${fmt(v69)}</span></span></li>`;
+    }).join("")}</ul></div>`).join("");
+}
+document.querySelectorAll(".mvtabs [data-t]").forEach(b => b.onclick = () => { mvTab = b.dataset.t; if (mvTab === "win") mvFrom = ""; document.querySelectorAll(".mvtabs [data-t]").forEach(x => x.setAttribute("aria-selected", x === b)); moversList(); });
+document.getElementById("mvhl").onclick = () => {
+  mvFrom = mvFrom ? "" : "ก้าวไกล";
+  if (mvFrom) { mvTab = "lose"; document.querySelectorAll(".mvtabs [data-t]").forEach(x => x.setAttribute("aria-selected", x.dataset.t === "lose")); }
+  moversList();
+  if (mvFrom) document.getElementById("mvgrid").scrollIntoView({ behavior: "smooth", block: "nearest" });
+};
+moversList();
+
+render();
+</script>
+
+</body>
+</html>
